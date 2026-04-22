@@ -1,0 +1,12 @@
+---
+import Layout from '../layouts/Layout.astro';
+import GuidelinesComponent from '../components/admin/guidelines';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+---
+
+<Layout title="Panduan - Raport Madin">
+	<GuidelinesComponent client:only="react" user={sessionUser} />
+</Layout>

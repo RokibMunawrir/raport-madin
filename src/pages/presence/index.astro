@@ -1,0 +1,117 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PresenceManagement from "../../components/admin/presence";
+import { db } from "../../db";
+import { classrooms, academicYears } from "../../db/schema";
+import { getAttendanceByDateAndClass, saveBulkAttendance } from "../../db/queries/attendance";
+import { eq } from "drizzle-orm";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+const userRole = sessionUser.role;
+const userTeacherId = sessionUser.teacherId;
+
+// 1. Fetch Master Data
+const allClasses = await db.select().from(classrooms)
+    .where(userRole === 'Guru' && userTeacherId ? eq(classrooms.teacherId, userTeacherId) : undefined)
+    .orderBy(classrooms.name);
+
+const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
+
+// 2. Get Filters from Query Params
+const url = new URL(Astro.request.url);
+const selectedDate = url.searchParams.get("date") || new Date().toISOString().split('T')[0];
+const selectedClass = url.searchParams.get("classroom") || (allClasses[0]?.id || "");
+
+// 3. Fetch Student & Attendance Data
+let studentData: any[] = [];
+let initialPresence: any = {};
+
+if (selectedClass) {
+    const { students, attendance } = await getAttendanceByDateAndClass(selectedDate, selectedClass);
+    
+    studentData = students.map(s => ({
+        id: s.id,
+        name: s.name,
+        nis: s.nis || '-',
+        class: allClasses.find(c => c.id === s.classroomId)?.name || '-',
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`
+    }));
+
+    // Map existing attendance to format that PresenceManagement expects: { studentId: ['H', 'H', 'I'] }
+    attendance.forEach(a => {
+        if (!initialPresence[a.studentId]) {
+            initialPresence[a.studentId] = ['H', 'H', 'H']; // Default
+        }
+        
+        // Map status from DB to UI
+        const statusMap: Record<string, string> = {
+            'Hadir': 'H',
+            'Izin': 'I',
+            'Sakit': 'S',
+            'Alpha': 'A'
+        };
+        
+        const sessionIdx = a.session - 1;
+        if (sessionIdx >= 0 && sessionIdx < 3) {
+            initialPresence[a.studentId][sessionIdx] = statusMap[a.status] || 'H';
+        }
+    });
+}
+
+// 4. Handle POST Actions
+if (Astro.request.method === "POST") {
+    try {
+        const payload = await Astro.request.json();
+        const { date, presenceData } = payload;
+
+        if (activeYear[0]) {
+            const statusMap: Record<string, string> = {
+                'H': 'Hadir',
+                'I': 'Izin',
+                'S': 'Sakit',
+                'A': 'Alpha'
+            };
+
+            const recordsToSave: any[] = [];
+            for (const [studentId, statusArray] of Object.entries(presenceData)) {
+                (statusArray as string[]).forEach((status, idx) => {
+                    recordsToSave.push({
+                        studentId,
+                        academicYearId: activeYear[0].id,
+                        date,
+                        session: idx + 1,
+                        status: statusMap[status] as any,
+                        notes: ""
+                    });
+                });
+            }
+
+            if (recordsToSave.length > 0) {
+                await saveBulkAttendance(recordsToSave);
+            }
+            
+            return new Response(JSON.stringify({ success: true }), { status: 200 });
+        }
+    } catch (e) {
+        console.error("Error saving attendance:", e);
+        return new Response(JSON.stringify({ success: false }), { status: 500 });
+    }
+}
+
+---
+
+<Layout title="Presensi Santri - Raport Madin">
+    <PresenceManagement 
+        client:only="react" 
+        initialStudents={studentData}
+        initialPresence={initialPresence}
+        classrooms={allClasses}
+        selectedDate={selectedDate}
+        selectedClassId={selectedClass}
+        user={sessionUser}
+    />
+
+</Layout>

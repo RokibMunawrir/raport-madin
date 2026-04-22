@@ -1,0 +1,129 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import DormitoryManagement from "../../../components/data/dormitory";
+import { addDormitory, updateDormitory, deleteDormitory } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { dormitories, students } from "../../../db/schema";
+import { eq, count, sql, and, desc, like } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        const id = formData.get("id") as string;
+
+        const dormData = {
+            name: formData.get("name") as string,
+            gender: formData.get("gender") as string || "Putra",
+            block: formData.get("block") as string,
+            roomCode: formData.get("roomCode") as string,
+            head: formData.get("head") as string,
+            capacity: parseInt(formData.get("capacity") as string || "0"),
+        };
+
+        let successStatus = "";
+
+        if (action === "delete" && id) {
+            await deleteDormitory(id);
+            successStatus = "deleted";
+        } else if (action === "edit" && id && dormData.name) {
+            await updateDormitory(id, dormData);
+            successStatus = "updated";
+        } else if (action === "add" && dormData.name) {
+            await addDormitory(dormData);
+            successStatus = "added";
+        }
+
+        if (successStatus) {
+            return Astro.redirect(`/master-data/dormitory?toast=${successStatus}`);
+        }
+    } catch (e) {
+        console.error("Error processing dormitory action:", e);
+    }
+}
+
+// 2. Fetch Query Parameters
+const url = new URL(Astro.url);
+const page = parseInt(url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+const search = url.searchParams.get("search") || "";
+const blockFilter = url.searchParams.get("block") || "All";
+const categoryFilter = url.searchParams.get("category") || "All";
+
+// 3. Build Filters
+const filters = [];
+if (search) {
+    filters.push(like(dormitories.name, `%${search}%`));
+}
+if (blockFilter !== "All") {
+    filters.push(eq(dormitories.block, blockFilter));
+}
+if (categoryFilter !== "All") {
+    filters.push(eq(dormitories.gender, categoryFilter));
+}
+
+const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+// 4. Fetch Total Count
+const totalCountResult = await db
+    .select({ total: count() })
+    .from(dormitories)
+    .where(filterQuery);
+
+const totalCount = totalCountResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / limit);
+
+// 5. Fetch Paginated Data (Dormitories + Occupancy Count)
+const dormResults = await db
+    .select({
+        id: dormitories.id,
+        name: dormitories.name,
+        gender: dormitories.gender,
+        block: dormitories.block,
+        roomCode: dormitories.roomCode,
+        head: dormitories.head,
+        capacity: dormitories.capacity,
+        filledCount: count(students.id),
+    })
+    .from(dormitories)
+    .leftJoin(students, eq(dormitories.id, students.dormitoryId))
+    .where(filterQuery)
+    .limit(limit)
+    .offset(offset)
+    .groupBy(dormitories.id)
+    .orderBy(desc(dormitories.createdAt));
+
+const initialData = dormResults.map(d => ({
+    id: d.id,
+    name: d.name,
+    category: (d.gender as any) || 'Putra',
+    block: d.block || '-',
+    roomCode: (d as any).roomCode || '-',
+    supervisor: d.head || '-',
+    capacity: d.capacity || 0,
+    filled: Number(d.filledCount) || 0
+}));
+
+---
+
+<Layout title="Master Data Asrama | Admin Panel">
+    <DormitoryManagement 
+        initialData={initialData} 
+        client:only="react" 
+        currentPage={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        searchQuery={search}
+        blockFilter={blockFilter}
+        categoryFilter={categoryFilter}
+        user={sessionUser}
+    />
+
+</Layout>

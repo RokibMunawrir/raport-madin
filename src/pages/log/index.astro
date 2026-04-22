@@ -1,0 +1,25 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import SystemLog from '../../components/admin/log';
+import { getAllActivityLogs, getActivityLogStats } from '../../db/queries/logs';
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+const result = await getAllActivityLogs({ page: 1, limit: 10 });
+const stats = await getActivityLogStats();
+
+---
+
+<Layout title="System Logs - Raport Madin">
+  <SystemLog 
+    client:only="react"
+    initialLogs={result.logs}
+    total={result.total}
+    totalPages={result.totalPages}
+    currentPage={result.currentPage}
+    stats={stats}
+    user={sessionUser}
+  />
+
+</Layout>

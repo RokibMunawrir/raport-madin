@@ -1,0 +1,162 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import ClassManagement, { type SchoolClass } from "../../../components/data/class";
+import { addClassroom, updateClassroom, deleteClassroom } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { classrooms, teachers, studentClassrooms } from "../../../db/schema";
+import { count, eq, like, and, sql, desc } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        const id = formData.get("id") as string;
+        
+        let successStatus = "";
+
+        if (action === "add_class") {
+            await addClassroom({
+                name: formData.get("name") as string,
+                level: formData.get("level") as string,
+                gender: formData.get("gender") as string,
+                capacity: parseInt(formData.get("capacity") as string) || 30,
+                room: formData.get("room") as string,
+                teacherId: (formData.get("teacherId") as string) || null,
+            });
+            successStatus = "created";
+        } else if (action === "update_class") {
+            await updateClassroom(id, {
+                name: formData.get("name") as string,
+                level: formData.get("level") as string,
+                gender: formData.get("gender") as string,
+                capacity: parseInt(formData.get("capacity") as string) || 30,
+                room: formData.get("room") as string,
+                teacherId: (formData.get("teacherId") as string) || null,
+            });
+            successStatus = "updated";
+        } else if (action === "delete_class") {
+            await deleteClassroom(id);
+            successStatus = "deleted";
+        }
+
+        if (successStatus) {
+            const currentUrl = new URL(Astro.request.url);
+            currentUrl.searchParams.set("toast", successStatus);
+            return Astro.redirect(currentUrl.toString());
+        }
+    } catch (e) {
+        console.error("Error processing class action:", e);
+    }
+}
+
+// 2. Get Query Parameters
+const url = new URL(Astro.url);
+const page = parseInt(url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+const search = url.searchParams.get("search") || "";
+const level = url.searchParams.get("level") || "All";
+const gender = url.searchParams.get("gender") || "All";
+
+// 3. Build Filters
+const filters = [];
+if (search) {
+    filters.push(like(classrooms.name, `%${search}%`));
+}
+if (level && level !== 'All') {
+    filters.push(eq(classrooms.level, level));
+}
+if (gender && gender !== 'All') {
+    filters.push(eq(classrooms.gender, gender));
+}
+
+const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+// 4. Fetch Total Count for Pagination
+const totalCountResult = await db
+    .select({ total: count() })
+    .from(classrooms)
+    .where(filterQuery);
+
+const totalCount = totalCountResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / limit);
+
+// 5. Fetch Statistics for "Putra" and "Putri"
+const putraCountResult = await db
+    .select({ total: count() })
+    .from(classrooms)
+    .where(eq(classrooms.gender, 'Putra'));
+
+const putraCount = putraCountResult[0]?.total || 0;
+
+const putriCountResult = await db
+    .select({ total: count() })
+    .from(classrooms)
+    .where(eq(classrooms.gender, 'Putri'));
+
+const putriCount = putriCountResult[0]?.total || 0;
+
+// 6. Fetch Paginated Classes with Teacher Names and Student Counts
+const classroomsData = await db
+    .select({
+        id: classrooms.id,
+        name: classrooms.name,
+        level: classrooms.level,
+        gender: classrooms.gender,
+        capacity: classrooms.capacity,
+        room: classrooms.room,
+        teacherId: classrooms.teacherId,
+        teacherName: teachers.name,
+        studentCount: sql<number>`(SELECT COUNT(*) FROM ${studentClassrooms} WHERE ${studentClassrooms.classroomId} = ${classrooms.id})`.mapWith(Number),
+    })
+    .from(classrooms)
+    .leftJoin(teachers, eq(classrooms.teacherId, teachers.id))
+    .where(filterQuery)
+    .limit(limit)
+    .offset(offset)
+    .orderBy(desc(classrooms.createdAt));
+
+// Mapping to ensure types match SchoolClass interface exactly
+const classes: SchoolClass[] = classroomsData.map(c => ({
+    id: c.id,
+    name: c.name,
+    level: c.level || 'ULA',
+    gender: c.gender || 'Putra',
+    capacity: c.capacity || 30,
+    teacherId: c.teacherId,
+    teacherName: c.teacherName,
+    studentCount: c.studentCount || 0,
+    room: c.room || '-',
+}));
+
+// 7. Fetch Teachers for the "Add Class" Modal
+const teachersList = await db
+    .select({ id: teachers.id, name: teachers.name })
+    .from(teachers)
+    .orderBy(teachers.name);
+
+---
+
+<Layout title="Master Data Kelas - Raport Madin">
+    <ClassManagement 
+        client:only="react" 
+        initialClasses={classes}
+        currentPage={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        putraCount={putraCount}
+        putriCount={putriCount}
+        teachers={teachersList}
+        searchQuery={search}
+        levelFilter={level}
+        genderFilter={gender}
+        user={sessionUser}
+    />
+
+</Layout>

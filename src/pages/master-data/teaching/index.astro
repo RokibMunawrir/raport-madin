@@ -1,0 +1,140 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import TeachingManagement from "../../../components/data/teaching.tsx";
+import { addTeachingAssignment, updateTeachingAssignment, deleteTeachingAssignment } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { teachingAssignments, teachers, subjects, classrooms, academicYears } from "../../../db/schema";
+import { eq, and, desc, like, count } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        const id = formData.get("id") as string;
+
+        const assignmentData = {
+            teacherId: formData.get("teacherId") as string,
+            subjectId: formData.get("subjectId") as string,
+            classroomId: formData.get("classroomId") as string,
+            day: formData.get("day") as string,
+            period: formData.get("period") as string,
+        };
+
+        let successStatus = "";
+
+        if (action === "delete" && id) {
+            await deleteTeachingAssignment(id);
+            successStatus = "deleted";
+        } else if (action === "edit" && id) {
+            await updateTeachingAssignment(id, assignmentData);
+            successStatus = "updated";
+        } else if (action === "add") {
+            await addTeachingAssignment(assignmentData);
+            successStatus = "added";
+        }
+
+        if (successStatus) {
+            return Astro.redirect(`/master-data/teaching?toast=${successStatus}`);
+        }
+    } catch (e) {
+        console.error("Error processing teaching assignment action:", e);
+    }
+}
+
+// 2. Fetch Query Parameters
+const url = new URL(Astro.url);
+const page = parseInt(url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+const search = url.searchParams.get("search") || "";
+const classFilter = url.searchParams.get("class") || "All";
+
+// 3. Build Filters
+const filters = [];
+if (search) {
+    filters.push(like(teachers.name, `%${search}%`));
+}
+if (classFilter !== "All") {
+    filters.push(eq(teachingAssignments.classroomId, classFilter));
+}
+
+const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+// 4. Fetch Meta Data for Dropdowns
+const [teachersList, subjectsList, classroomsList] = await Promise.all([
+    db.select().from(teachers).orderBy(teachers.name),
+    db.select().from(subjects).orderBy(subjects.name),
+    db.select().from(classrooms).orderBy(classrooms.name),
+]);
+
+// 5. Fetch Total Count
+const totalCountResult = await db
+    .select({ total: count() })
+    .from(teachingAssignments)
+    .leftJoin(teachers, eq(teachingAssignments.teacherId, teachers.id))
+    .where(filterQuery);
+
+const totalCount = totalCountResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / limit);
+
+// 6. Fetch Paginated Assignments
+const assignmentResults = await db
+    .select({
+        id: teachingAssignments.id,
+        teacherId: teachingAssignments.teacherId,
+        teacherName: teachers.name,
+        teacherNip: teachers.nip,
+        teacherAvatar: teachers.avatar,
+        subjectId: teachingAssignments.subjectId,
+        subjectName: subjects.name,
+        subjectCode: subjects.code,
+        subjectIcon: subjects.icon,
+        classId: teachingAssignments.classroomId,
+        className: classrooms.name,
+        classLevel: classrooms.level,
+        day: teachingAssignments.day,
+        period: teachingAssignments.period,
+    })
+    .from(teachingAssignments)
+    .leftJoin(teachers, eq(teachingAssignments.teacherId, teachers.id))
+    .leftJoin(subjects, eq(teachingAssignments.subjectId, subjects.id))
+    .leftJoin(classrooms, eq(teachingAssignments.classroomId, classrooms.id))
+    .where(filterQuery)
+    .limit(limit)
+    .offset(offset)
+    .orderBy(desc(teachingAssignments.createdAt));
+
+const initialData = assignmentResults.map(a => ({
+    id: a.id,
+    teacherId: a.teacherId,
+    teacher: { id: a.teacherId, name: a.teacherName ?? "Guru Tidak Diketahui", nip: a.teacherNip, avatar: a.teacherAvatar },
+    subject: { id: a.subjectId, name: a.subjectName ?? "Mapel Tidak Diketahui", code: a.subjectCode ?? "-", icon: a.subjectIcon },
+    class: { id: a.classId, name: a.className ?? "Kelas Tidak Diketahui", level: a.classLevel },
+    day: a.day || "-",
+    period: a.period || "-",
+}));
+
+---
+
+<Layout title="Manajemen Pengajaran | Admin Panel">
+    <TeachingManagement 
+        initialData={initialData} 
+        teachers={teachersList}
+        subjects={subjectsList}
+        classrooms={classroomsList}
+        client:only="react" 
+        currentPage={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        searchQuery={search}
+        classFilter={classFilter}
+        user={sessionUser}
+    />
+
+</Layout>

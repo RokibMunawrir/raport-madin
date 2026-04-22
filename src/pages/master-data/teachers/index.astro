@@ -1,0 +1,132 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import TeacherManagement from "../../../components/data/teachers";
+import { addTeacher, updateTeacher, deleteTeacher } from "../../../db/queries/teachers";
+import { db } from "../../../db";
+import { teachers } from "../../../db/schema";
+import { count, eq, like, and, desc, or } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Get Query Parameters
+const url = new URL(Astro.url);
+const page = parseInt(url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+const search = url.searchParams.get("search") || "";
+const statusFilter = url.searchParams.get("status") || "All";
+
+// 2. Build Filters
+const filters = [];
+if (search) {
+    filters.push(or(
+      like(teachers.name, `%${search}%`),
+      like(teachers.nip, `%${search}%`)
+    ));
+}
+if (statusFilter && statusFilter !== 'All') {
+    filters.push(eq(teachers.status, statusFilter));
+}
+
+const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+// 3. Handle POST Actions
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get("_action") as string;
+    const id = formData.get("id") as string;
+    
+    const teacherData = {
+      name: formData.get("name") as string,
+      nip: formData.get("nip") as string,
+      gender: formData.get("gender") as string,
+      phone: formData.get("phone") as string,
+      email: formData.get("email") as string,
+      address: formData.get("address") as string,
+      province: formData.get("province") as string,
+      regency: formData.get("regency") as string,
+      district: formData.get("district") as string,
+      village: formData.get("village") as string,
+      birthPlace: formData.get("birthPlace") as string,
+      birthDate: formData.get("birthDate") as string,
+      status: formData.get("status") as string,
+      joinedDate: formData.get("joinedDate") as string,
+    };
+
+    let successStatus = "";
+
+    if (action === "delete" && id) {
+      await deleteTeacher(id);
+      successStatus = "deleted";
+    } else if (action === "edit" && id && teacherData.name) {
+      await updateTeacher(id, teacherData);
+      successStatus = "updated";
+    } else if (action === "add" && teacherData.name) {
+      await addTeacher(teacherData);
+      successStatus = "added";
+    }
+
+    if (successStatus) {
+      return Astro.redirect(`/master-data/teachers?toast=${successStatus}`);
+    }
+  } catch (e) {
+    console.error("Error processing teacher action:", e);
+  }
+}
+
+// 4. Fetch Total Count
+const totalCountResult = await db
+    .select({ total: count() })
+    .from(teachers)
+    .where(filterQuery);
+
+const totalCount = totalCountResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / limit);
+
+// 5. Fetch Paginated Teachers
+const teachersData = await db
+    .select()
+    .from(teachers)
+    .where(filterQuery)
+    .limit(limit)
+    .offset(offset)
+    .orderBy(desc(teachers.createdAt));
+
+// Transform to component's expected structure
+const initialData = teachersData.map(t => ({
+  id: t.id,
+  name: t.name,
+  nip: t.nip || '-',
+  gender: t.gender || 'Laki-laki',
+  phone: t.phone || '-',
+  email: t.email || '-',
+  address: t.address || '-',
+  birthPlace: t.birthPlace || '-',
+  birthDate: t.birthDate || '-',
+  status: t.status as any || 'Aktif',
+  joinedDate: t.joinedDate || '-',
+  province: t.province ?? undefined,
+  regency: t.regency ?? undefined,
+  district: t.district ?? undefined,
+  village: t.village ?? undefined,
+  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${t.name}`
+}));
+---
+
+<Layout title="Master Data Asatidz | Admin Panel">
+  <TeacherManagement 
+    initialData={initialData} 
+    client:only="react" 
+    currentPage={page}
+    totalPages={totalPages}
+    totalCount={totalCount}
+    searchQuery={search}
+    statusFilter={statusFilter}
+    user={sessionUser}
+  />
+
+</Layout>

@@ -1,0 +1,129 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import StudentManagement from "../../components/admin/student";
+import { db } from "../../db";
+import { classrooms, studentClassrooms, academicYears, students } from "../../db/schema";
+import { eq, and, notExists, desc } from "drizzle-orm";
+import { addStudentPlacement, deleteStudentPlacement } from "../../db/queries/masterData";
+import { getStudentsWithClass } from "../../db/queries/students";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+const userRole = sessionUser.role;
+const userTeacherId = sessionUser.teacherId;
+
+// 1. Fetch Active Academic Year
+const activeYearResult = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
+const activeYear = activeYearResult[0];
+
+// 2. Handle POST Actions
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        
+        let successStatus = "";
+
+        if (action === "assign_student" && activeYear) {
+            const studentId = formData.get("studentId") as string;
+            const classroomId = formData.get("classroomId") as string;
+            
+            await addStudentPlacement({
+                studentId,
+                classroomId,
+                academicYearId: activeYear.id
+            });
+            successStatus = "assigned";
+        } else if (action === "unassign_student" && activeYear) {
+            const studentId = formData.get("studentId") as string;
+            const classroomId = formData.get("classroomId") as string;
+            
+            const target = await db.select().from(studentClassrooms)
+                .where(and(
+                    eq(studentClassrooms.studentId, studentId),
+                    eq(studentClassrooms.classroomId, classroomId),
+                    eq(studentClassrooms.academicYearId, activeYear.id)
+                )).limit(1);
+
+            if (target[0]) {
+                await deleteStudentPlacement(target[0].id);
+                successStatus = "unassigned";
+            }
+        }
+
+        if (successStatus) {
+            const currentUrl = new URL(Astro.request.url);
+            currentUrl.searchParams.set("toast", successStatus);
+            return Astro.redirect(currentUrl.toString());
+        }
+    } catch (e) {
+        console.error("Error processing placement action:", e);
+    }
+}
+
+// 3. Fetch Teacher's Classroom (if applicable)
+const teacherClassResult = userTeacherId 
+    ? await db.select({ id: classrooms.id, name: classrooms.name }).from(classrooms).where(eq(classrooms.teacherId, userTeacherId)).limit(1)
+    : [];
+const teacherClass = teacherClassResult[0];
+
+// 4. Fetch Unassigned Students
+const unassignedStudentsResult = activeYear ? await db
+    .select({
+        id: students.id,
+        nis: students.nis,
+        name: students.name,
+        gender: students.gender,
+        avatar: students.avatar,
+    })
+    .from(students)
+    .where(
+        notExists(
+            db.select().from(studentClassrooms)
+              .where(and(
+                  eq(studentClassrooms.studentId, students.id),
+                  eq(studentClassrooms.academicYearId, activeYear.id)
+              ))
+        )
+    )
+    .limit(50) : [];
+
+// Filter students for Guru/Wali Kelas
+const studentsData = await getStudentsWithClass(userRole === 'Guru' ? userTeacherId : undefined);
+
+const stats = {
+  total: studentsData.length,
+  aktif: studentsData.filter((s: any) => s.status === 'Aktif').length,
+  alumni: studentsData.filter((s: any) => s.status === 'Lulus').length,
+  keluar: studentsData.filter((s: any) => s.status === 'Keluar').length,
+};
+
+const initialData = studentsData.map((s: any) => ({
+  id: s.id,
+  name: s.name,
+  nisn: s.nisn || '-',
+  nis: s.nis,
+  gender: s.gender || '-',
+  class: s.className || 'Belum Ada Kelas',
+  dormitory: s.dormitoryName || 'Belum Ada Asrama',
+  roomCode: s.roomCode || '-',
+  status: (s.status as any) || 'Aktif',
+  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`,
+  email: '-', 
+}));
+---
+
+<Layout title="Siswa | Admin Panel">
+    <StudentManagement 
+        initialData={initialData} 
+        stats={stats} 
+        user={sessionUser} 
+        activeYear={activeYear}
+        teacherClass={teacherClass}
+        unassignedStudents={unassignedStudentsResult}
+        client:only="react" 
+    />
+
+</Layout>

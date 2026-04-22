@@ -1,0 +1,37 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import DetailStudent from "../../../components/student/DetailStudent";
+import { getStudentById } from "../../../db/queries/students";
+import { getFullStudentReportData } from "../../../db/queries/reports";
+import { getActiveAcademicYear } from "../../../db/queries/dashboard";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+const { id } = Astro.params;
+
+if (!id) {
+    return Astro.redirect("/students");
+}
+
+const student = await getStudentById(id);
+
+if (!student) {
+    return Astro.redirect("/students");
+}
+
+const activeYear = await getActiveAcademicYear();
+const reportData = activeYear ? await getFullStudentReportData(id, activeYear.id) : null;
+---
+
+<Layout title={`Detail ${student.name} - Raport Madin`}>
+    <DetailStudent 
+        client:only="react" 
+        student={student}
+        user={sessionUser}
+        reportData={reportData}
+    />
+</Layout>

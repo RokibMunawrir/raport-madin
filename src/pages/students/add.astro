@@ -1,0 +1,78 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import AddStudent from "../../components/student/AddStudent";
+import { addStudent } from "../../db/queries/students";
+import { addStudentPlacement } from "../../db/queries/masterData";
+import { db } from "../../db";
+import { dormitories, classrooms, academicYears, studentClassrooms } from "../../db/schema";
+import { eq, or } from "drizzle-orm";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+// 1. Fetch Necessary Data
+const dormsResult = await db.select().from(dormitories).orderBy(dormitories.name);
+const allDormitories = dormsResult.map(d => ({
+    ...d,
+    roomCode: d.roomCode ?? undefined,
+}));
+const allClassrooms = await db.select().from(classrooms).orderBy(classrooms.name);
+const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
+
+// 2. Handle POST Actions
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    
+    const studentData = {
+      nis: formData.get("nis") as string,
+      name: formData.get("name") as string,
+      gender: formData.get("gender") as string,
+      birthPlace: formData.get("birthPlace") as string,
+      birthDate: formData.get("birthDate") as string,
+      address: formData.get("address") as string,
+      province: formData.get("province") as string,
+      regency: formData.get("regency") as string,
+      district: formData.get("district") as string,
+      village: formData.get("village") as string,
+      parentName: formData.get("parentName") as string,
+      phone: formData.get("phone") as string,
+      dormitoryId: formData.get("dormitoryId") as string,
+      roomCode: formData.get("roomCode") as string,
+      status: "Aktif",
+    };
+
+    const classroomId = formData.get("classroomId") as string;
+
+    if (studentData.name && studentData.nis) {
+      const student = await addStudent(studentData);
+      
+      // Handle classroom placement if selected and active year exists
+      if (student && classroomId && activeYear[0]) {
+        await addStudentPlacement({
+            studentId: student.insertedId,
+            classroomId: classroomId,
+            academicYearId: activeYear[0].id,
+        });
+      }
+
+      return Astro.redirect("/students?toast=added");
+    }
+  } catch (e) {
+    console.error("Error adding student:", e);
+  }
+}
+---
+
+<Layout title="Tambah Siswa - Raport Madin">
+    <AddStudent 
+        client:only="react" 
+        dormitories={allDormitories} 
+        classrooms={allClassrooms}
+        activeYear={activeYear[0]}
+        user={sessionUser}
+    />
+</Layout>

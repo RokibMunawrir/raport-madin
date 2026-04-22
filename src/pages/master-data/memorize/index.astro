@@ -1,0 +1,67 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import MemorizeManagement from "../../../components/data/memorize";
+import { addMemorizeTarget, updateMemorizeTarget, deleteMemorizeTarget } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { memorizeTargets } from "../../../db/schema";
+import { eq, desc } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        const id = formData.get("id") as string;
+        
+        let successStatus = "";
+
+        if (action === "add_target") {
+            await addMemorizeTarget({
+                title: formData.get("title") as string,
+                category: formData.get("category") as string,
+                levels: formData.get("levels") as string, // Comma separated
+                points: parseInt(formData.get("points") as string) || 0,
+                description: formData.get("description") as string,
+            });
+            successStatus = "created";
+        } else if (action === "update_target") {
+            await updateMemorizeTarget(id, {
+                title: formData.get("title") as string,
+                category: formData.get("category") as string,
+                levels: formData.get("levels") as string,
+                points: parseInt(formData.get("points") as string) || 0,
+                description: formData.get("description") as string,
+            });
+            successStatus = "updated";
+        } else if (action === "delete_target") {
+            await deleteMemorizeTarget(id);
+            successStatus = "deleted";
+        }
+
+        if (successStatus) {
+            const currentUrl = new URL(Astro.request.url);
+            currentUrl.searchParams.set("toast", successStatus);
+            return Astro.redirect(currentUrl.toString());
+        }
+    } catch (e) {
+        console.error("Error processing memorize action:", e);
+    }
+}
+
+// 2. Fetch All Targets
+const allTargets = await db.select().from(memorizeTargets).orderBy(desc(memorizeTargets.createdAt));
+
+---
+
+<Layout title="Target Hafalan | Admin Panel">
+  <MemorizeManagement 
+    client:only="react" 
+    initialTargets={allTargets} 
+    user={sessionUser}
+  />
+</Layout>
+

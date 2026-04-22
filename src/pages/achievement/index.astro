@@ -1,0 +1,102 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import AchivementManagement from "../../components/admin/achievement";
+import { getAchievements, addAchievement, deleteAchievement } from "../../db/queries/achievements";
+import { db } from "../../db";
+import { students, academicYears, memorizeTargets, classrooms, studentClassrooms } from "../../db/schema";
+import { eq, desc, and } from "drizzle-orm";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+const userRole = sessionUser.role;
+const userTeacherId = sessionUser.teacherId;
+
+// 1. Fetch Necessary Data
+const achievements = await getAchievements(userRole === 'Guru' ? userTeacherId : undefined);
+
+// For students dropdown, if Guru, only show students from their class
+const teacherClassId = (userRole === 'Guru' && userTeacherId) 
+    ? (await db.select({ id: classrooms.id }).from(classrooms).where(eq(classrooms.teacherId, userTeacherId)).limit(1))[0]?.id
+    : null;
+
+const allStudents = await db.select({ 
+    id: students.id, 
+    name: students.name, 
+    nis: students.nis 
+})
+.from(students)
+.leftJoin(studentClassrooms, eq(students.id, studentClassrooms.studentId))
+.where(teacherClassId ? eq(studentClassrooms.classroomId, teacherClassId) : undefined)
+.orderBy(students.name);
+const memorizeTargetsList = await db.select().from(memorizeTargets).orderBy(memorizeTargets.title);
+const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
+
+// 2. Handle POST Actions
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("action") as string;
+
+        if (action === "add") {
+            await addAchievement({
+                studentId: formData.get("studentId") as string,
+                academicYearId: activeYear[0].id,
+                title: formData.get("title") as string,
+                category: formData.get("category") as string,
+                level: formData.get("level") as string,
+                rank: formData.get("rank") as string,
+                date: formData.get("date") as string,
+                score: parseInt(formData.get("score") as string) || 0,
+                description: formData.get("description") as string,
+            });
+            return Astro.redirect("/achievement?toast=added");
+        }
+
+        if (action === "delete") {
+            const id = formData.get("id") as string;
+            await deleteAchievement(id);
+            return Astro.redirect("/achievement?toast=deleted");
+        }
+    } catch (e) {
+        console.error("Error processing achievement action:", e);
+    }
+}
+
+// 3. Stats Calculation
+const stats = {
+    total: achievements.length,
+    akademikPoin: achievements.filter(a => a.category.includes('Akademik')).reduce((sum, a) => sum + (a.score || 0), 0),
+    nonAkademikCount: achievements.filter(a => a.category.includes('Non-Akademik')).length,
+    nasionalCount: achievements.filter(a => a.level === 'Nasional').length,
+};
+
+// 4. Map to Component Props
+const mappedAchievements = achievements.map(a => ({
+    id: a.id,
+    studentName: a.studentName,
+    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${a.studentName}`,
+    nisn: a.nis,
+    title: a.title,
+    level: a.level as any,
+    category: a.category.split(',') as any,
+    rank: a.rank || '-',
+    date: a.date,
+    points: a.score || 0,
+}));
+
+---
+
+<Layout title="Prestasi">
+    <AchivementManagement 
+        client:only="react" 
+        initialData={mappedAchievements}
+        students={allStudents}
+        memorizeTargets={memorizeTargetsList}
+        activeYear={activeYear[0]}
+        stats={stats}
+        user={sessionUser}
+    />
+
+</Layout>

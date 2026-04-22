@@ -1,0 +1,112 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import StudentManagement from "../../../components/data/dataStudents";
+import { db } from "../../../db";
+import { students, classrooms, studentClassrooms, dormitories } from "../../../db/schema";
+import { count, eq, like, and, desc, or, sql } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Get Query Parameters
+const url = new URL(Astro.url);
+const page = parseInt(url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+const search = url.searchParams.get("search") || "";
+const statusFilter = url.searchParams.get("status") || "All";
+const genderFilter = url.searchParams.get("gender") || "All";
+const classFilter = url.searchParams.get("class") || "All";
+
+// 2. Build Filters
+const filters = [];
+if (search) {
+    filters.push(or(
+      like(students.name, `%${search}%`),
+      like(students.nis, `%${search}%`)
+    ));
+}
+if (statusFilter && statusFilter !== 'All') {
+    filters.push(eq(students.status, statusFilter));
+}
+if (genderFilter && genderFilter !== 'All') {
+    filters.push(eq(students.gender, genderFilter));
+}
+
+const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+// 3. Fetch Total Count
+const totalCountResult = await db
+    .select({ total: count() })
+    .from(students)
+    .where(filterQuery);
+
+const totalCount = totalCountResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / limit);
+
+// 4. Fetch Paginated Students with Class Name (via join)
+const studentsData = await db
+    .select({
+      id: students.id,
+      nis: students.nis,
+      name: students.name,
+      gender: students.gender,
+      parentName: students.parentName,
+      phone: students.phone,
+      status: students.status,
+      address: students.address,
+      birthDate: students.birthDate,
+      className: classrooms.name,
+      dormitoryName: dormitories.name,
+    })
+    .from(students)
+    .leftJoin(studentClassrooms, eq(students.id, studentClassrooms.studentId))
+    .leftJoin(classrooms, eq(studentClassrooms.classroomId, classrooms.id))
+    .leftJoin(dormitories, eq(students.dormitoryId, dormitories.id))
+    .where(filterQuery)
+    .limit(limit)
+    .offset(offset)
+    .orderBy(desc(students.createdAt));
+
+const initialData = studentsData.map(s => ({
+  id: s.id,
+  nis: s.nis,
+  name: s.name,
+  gender: (s.gender as any) || 'Laki-laki',
+  class: s.className || 'Belum Ada Kelas',
+  dormitory: s.dormitoryName || 'Belum Ada Asrama',
+  parentName: s.parentName || '-',
+  phone: s.phone || '-',
+  status: (s.status as any) || 'Aktif',
+  address: s.address || '-',
+  birthDate: s.birthDate || '-',
+  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`
+}));
+
+// 5. Fetch Unique Classes for the filter dropdown
+const classesList = await db
+    .select({ name: classrooms.name })
+    .from(classrooms)
+    .orderBy(classrooms.name);
+const uniqueClasses = classesList.map(c => c.name);
+
+---
+
+<Layout title="Master Data Santri">
+  <StudentManagement 
+    initialData={initialData} 
+    client:only="react" 
+    currentPage={page}
+    totalPages={totalPages}
+    totalCount={totalCount}
+    searchQuery={search}
+    statusFilter={statusFilter}
+    genderFilter={genderFilter}
+    classFilter={classFilter}
+    uniqueClasses={uniqueClasses}
+    user={sessionUser}
+  />
+
+</Layout>

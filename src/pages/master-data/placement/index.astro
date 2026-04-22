@@ -1,0 +1,193 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import ClassRoom from "../../../components/data/ClassRoom.tsx";
+import { updateClassroom, addStudentPlacement, deleteStudentPlacement } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { classrooms, teachers, students, studentClassrooms, academicYears } from "../../../db/schema";
+import { eq, and, notExists, sql } from "drizzle-orm";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+// 1. Fetch Active Academic Year
+const activeYearResult = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
+const activeYear = activeYearResult[0];
+
+
+if (!activeYear) {
+    // Should handle missing active year
+}
+
+// 2. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        
+        if (!activeYear) {
+            console.error("Attempted to process classroom placement action without an active academic year.");
+            return Astro.redirect(Astro.request.url + "?toast=no_active_year");
+        }
+
+        let successStatus = "";
+
+        if (action === "change_homeroom") {
+            const teacherId = formData.get("teacherId") as string;
+            const classId = formData.get("classId") as string;
+            await updateClassroom(classId, { teacherId });
+            successStatus = "homeroom_updated";
+        } else if (action === "assign_student") {
+            const studentId = formData.get("studentId") as string;
+            const classroomId = formData.get("classroomId") as string;
+            
+            // Check if already assigned for this year (just in case)
+            const existing = await db.select().from(studentClassrooms)
+                .where(and(
+                    eq(studentClassrooms.studentId, studentId),
+                    eq(studentClassrooms.academicYearId, activeYear.id)
+                ));
+            
+            if (existing.length === 0) {
+                await addStudentPlacement({
+                    studentId,
+                    classroomId,
+                    academicYearId: activeYear.id
+                });
+                successStatus = "assigned";
+            }
+        } else if (action === "bulk_assign_student") {
+            const studentIdsStr = formData.get("studentIds") as string;
+            const classroomId = formData.get("classroomId") as string;
+
+            if (!studentIdsStr || !classroomId) {
+                console.error("Missing studentIds or classroomId in bulk assignment request.");
+                return Astro.redirect(Astro.request.url + "?toast=error");
+            }
+
+            const studentIds = studentIdsStr.split(',').filter(id => id.trim() !== "");
+            
+            for (const studentId of studentIds) {
+                // Check if already assigned for this year
+                const existing = await db.select().from(studentClassrooms)
+                    .where(and(
+                        eq(studentClassrooms.studentId, studentId),
+                        eq(studentClassrooms.academicYearId, activeYear.id)
+                    ));
+                
+                if (existing.length === 0) {
+                    await addStudentPlacement({
+                        studentId,
+                        classroomId,
+                        academicYearId: activeYear.id
+                    });
+                }
+            }
+            successStatus = "assigned";
+        } else if (action === "unassign_student") {
+            const studentId = formData.get("studentId") as string;
+            const classroomId = formData.get("classroomId") as string;
+            
+            const target = await db.select().from(studentClassrooms)
+                .where(and(
+                    eq(studentClassrooms.studentId, studentId),
+                    eq(studentClassrooms.classroomId, classroomId),
+                    eq(studentClassrooms.academicYearId, activeYear.id)
+                )).limit(1);
+
+            if (target[0]) {
+                await deleteStudentPlacement(target[0].id);
+                successStatus = "unassigned";
+            }
+        }
+
+        if (successStatus) {
+            const currentUrl = new URL(Astro.request.url);
+            currentUrl.searchParams.set("toast", successStatus);
+            return Astro.redirect(currentUrl.toString());
+        }
+    } catch (e) {
+        console.error("Error processing classroom placement action:", e);
+    }
+}
+
+// 3. Fetch Query Parameters
+const url = new URL(Astro.url);
+const selectedClassId = url.searchParams.get("classId") || "";
+
+// 4. Fetch All Classrooms for Ribbon
+const allClassrooms = await db
+    .select({
+        id: classrooms.id,
+        name: classrooms.name,
+        level: classrooms.level,
+        room: sql<string>`'Gedung - ' || ${classrooms.name}`, // Placeholder for room
+        capacity: classrooms.capacity,
+        teacherId: classrooms.teacherId,
+        teacherName: teachers.name,
+        teacherNip: teachers.nip,
+        teacherAvatar: teachers.avatar,
+    })
+    .from(classrooms)
+    .leftJoin(teachers, eq(classrooms.teacherId, teachers.id))
+    .orderBy(classrooms.name);
+
+const activeClassId = selectedClassId || allClassrooms[0]?.id;
+
+// 5. Fetch Students in Current Class
+const classStudentsResult = activeClassId ? await db
+    .select({
+        id: students.id,
+        nis: students.nis,
+        name: students.name,
+        gender: students.gender,
+        avatar: students.avatar,
+        status: students.status,
+    })
+    .from(studentClassrooms)
+    .innerJoin(students, eq(studentClassrooms.studentId, students.id))
+    .where(and(
+        eq(studentClassrooms.classroomId, activeClassId),
+        eq(studentClassrooms.academicYearId, activeYear?.id || "")
+    )) : [];
+
+// 6. Fetch Unassigned Students (for Assignment Modal)
+const unassignedStudentsResult = await db
+    .select({
+        id: students.id,
+        nis: students.nis,
+        name: students.name,
+        gender: students.gender,
+        avatar: students.avatar,
+        status: students.status,
+    })
+    .from(students)
+    .where(
+        notExists(
+            db.select().from(studentClassrooms)
+              .where(and(
+                  eq(studentClassrooms.studentId, students.id),
+                  eq(studentClassrooms.academicYearId, activeYear?.id || "")
+              ))
+        )
+    )
+    .limit(50); // Limit to 50 for performance
+
+// 7. Fetch All Teachers (for Wali Kelas Dropdown)
+const allTeachers = await db.select().from(teachers).orderBy(teachers.name);
+
+---
+
+<Layout title="Penempatan Kelas | Admin Panel" activeItem="Penempatan Kelas">
+    <ClassRoom 
+        client:only="react" 
+        initialClassrooms={allClassrooms}
+        teachers={allTeachers}
+        initialStudents={classStudentsResult}
+        unassignedStudents={unassignedStudentsResult}
+        activeYear={activeYear}
+        initialSelectedClassId={activeClassId}
+        user={sessionUser}
+    />
+
+</Layout>

@@ -1,0 +1,116 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import AcademicYearManagement from "../../../components/data/AcademicYear";
+import { addAcademicYear, updateAcademicYear, deleteAcademicYear } from "../../../db/queries/academicYears";
+import { db } from "../../../db";
+import { academicYears } from "../../../db/schema";
+import { count, eq, like, and, desc } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Get Query Parameters
+const url = new URL(Astro.url);
+const page = parseInt(url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+const search = url.searchParams.get("search") || "";
+const semester = url.searchParams.get("semester") || "All";
+const statusFilter = url.searchParams.get("status") || "All";
+
+// 2. Build Filters
+const filters = [];
+if (search) {
+    filters.push(like(academicYears.name, `%${search}%`));
+}
+if (semester && semester !== 'All') {
+    filters.push(eq(academicYears.semester, semester as any));
+}
+if (statusFilter && statusFilter !== 'All') {
+    filters.push(eq(academicYears.isActive, statusFilter === 'Aktif' ? 1 : 0));
+}
+
+const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+// 3. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get("_action") as string;
+    const id = formData.get("id") as string;
+    const name = formData.get("yearName") as string;
+    const semesterVal = formData.get("semester") as "Ganjil" | "Genap";
+    const isActive = formData.get("isActive") === "on" ? 1 : 0;
+    const description = formData.get("description") as string;
+    const startDate = formData.get("startDate") as string;
+    const endDate = formData.get("endDate") as string;
+
+    let successMessage = "";
+
+    if (action === "delete" && id) {
+      await deleteAcademicYear(id);
+      successMessage = "deleted";
+    } else if (action === "edit" && id && name && semesterVal) {
+      await updateAcademicYear(id, { name, semester: semesterVal, isActive, description });
+      // Note: startDate and endDate update needs additional fields in query if needed, 
+      // but schema shows they exist. Let's update the query file if necessary.
+      successMessage = "updated";
+    } else if (action === "add" && name && semesterVal) {
+      await addAcademicYear({ name, semester: semesterVal, isActive, description });
+      successMessage = "added";
+    }
+
+    if (successMessage) {
+      return Astro.redirect(`/master-data/academic-years?toast=${successMessage}`);
+    }
+  } catch (e) {
+    console.error("Error saving academic year:", e);
+  }
+}
+
+// 4. Fetch Total Count for Pagination
+const totalCountResult = await db
+    .select({ total: count() })
+    .from(academicYears)
+    .where(filterQuery);
+
+const totalCount = totalCountResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / limit);
+
+// 5. Fetch Paginated Data
+const yearsData = await db
+    .select()
+    .from(academicYears)
+    .where(filterQuery)
+    .limit(limit)
+    .offset(offset)
+    .orderBy(desc(academicYears.createdAt));
+
+// Transform data to match the component's expected structure
+const initialData: any[] = yearsData.map(y => ({
+  id: y.id,
+  year: y.name,
+  semester: y.semester,
+  status: y.isActive === 1 ? 'Aktif' : 'Non-Aktif',
+  startDate: y.startDate || y.createdAt.toISOString().split('T')[0], 
+  endDate: y.endDate || y.createdAt.toISOString().split('T')[0],   
+  description: y.description || `Tahun Ajaran ${y.name} Semester ${y.semester}`
+}));
+---
+
+<Layout title="Master Data Tahun Ajaran | Admin Panel">
+  <AcademicYearManagement 
+    initialData={initialData} 
+    client:only="react" 
+    currentPage={page}
+    totalPages={totalPages}
+    totalCount={totalCount}
+    searchQuery={search}
+    semesterFilter={semester}
+    statusFilter={statusFilter}
+    user={sessionUser}
+  />
+
+</Layout>

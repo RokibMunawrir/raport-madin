@@ -1,0 +1,78 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import ScoreManagement from "../../components/admin/score";
+import { db } from "../../db";
+import { classrooms, academicYears, subjects } from "../../db/schema";
+import { getGradingData, saveBulkGrading } from "../../db/queries/scores";
+import { eq } from "drizzle-orm";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+// 1. Fetch Master Data
+const allClasses = await db.select().from(classrooms).orderBy(classrooms.name);
+const allYears = await db.select().from(academicYears).orderBy(academicYears.name);
+const allSubjects = await db.select().from(subjects).orderBy(subjects.name);
+
+const activeYear = allYears.find(y => y.isActive === 1) || allYears[0];
+
+// 2. Get Filters from Query Params
+const url = new URL(Astro.request.url);
+const selectedYearId = url.searchParams.get("year") || (activeYear?.id || "");
+const selectedSubjectId = url.searchParams.get("subject") || (allSubjects[0]?.id || "");
+const selectedClassId = url.searchParams.get("classroom") || (allClasses[0]?.id || "");
+
+// 3. Fetch Grading Matrix
+let studentScores: any[] = [];
+if (selectedYearId && selectedSubjectId && selectedClassId) {
+    const { students, scores, notes } = await getGradingData(selectedYearId, selectedSubjectId, selectedClassId);
+    
+    studentScores = students.map(s => {
+        const studentScore = scores.find(sc => sc.studentId === s.id);
+        const studentNote = notes.find(n => n.studentId === s.id);
+        
+        return {
+            id: s.id,
+            name: s.name,
+            nisn: s.nisn || '-',
+            class: allClasses.find(c => c.id === s.classroomId)?.name || '-',
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${s.name}`,
+            harian: studentScore?.harian || 0,
+            semester: studentScore?.semester || 0,
+            note: studentNote?.content || ""
+        };
+    });
+}
+
+// 4. Handle POST Actions
+if (Astro.request.method === "POST") {
+    try {
+        const payload = await Astro.request.json();
+        const { yearId, subjectId, data } = payload;
+
+        if (yearId && subjectId) {
+            await saveBulkGrading(yearId, subjectId, data);
+            return new Response(JSON.stringify({ success: true }), { status: 200 });
+        }
+    } catch (e) {
+        console.error("Error saving grades:", e);
+        return new Response(JSON.stringify({ success: false }), { status: 500 });
+    }
+}
+---
+
+<Layout title="Manajemen Nilai - Raport Madin">
+    <ScoreManagement 
+        client:only="react" 
+        initialStudentScores={studentScores}
+        subjects={allSubjects}
+        academicYears={allYears}
+        classrooms={allClasses}
+        selectedYearId={selectedYearId}
+        selectedSubjectId={selectedSubjectId}
+        selectedClassId={selectedClassId}
+        user={sessionUser}
+    />
+
+</Layout>

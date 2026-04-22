@@ -1,0 +1,56 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import DashboardDemo from '../../components/admin/DashboardDemo';
+import { 
+	getAdminStats, 
+	getRecentActivityLogs, 
+	getSystemStatus, 
+	getActiveAcademicYear,
+	getWaliKelasData,
+	getTeacherDashboardData,
+	getStaffData
+} from '../../db/queries/dashboard';
+import { db } from '../../db';
+import { classrooms } from '../../db/schema';
+import { isNotNull } from 'drizzle-orm';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+
+const stats = await getAdminStats();
+const recentLogs = await getRecentActivityLogs();
+const systemMetrics = await getSystemStatus();
+const academicYear = await getActiveAcademicYear();
+
+// For Guru or Wali Kelas, fetch their specific data
+const userRole = sessionUser.role;
+const userTeacherId = sessionUser.teacherId;
+
+const waliKelasData = userTeacherId 
+	? await getWaliKelasData(userTeacherId)
+	: null;
+
+const teacherData = userTeacherId 
+	? await getTeacherDashboardData(userTeacherId)
+	: null;
+
+const staffData = await getStaffData();
+---
+
+<Layout title="Dashboard - Raport Madin">
+	<DashboardDemo 
+		client:only="react" 
+		stats={stats} 
+		recentLogs={recentLogs} 
+		systemMetrics={systemMetrics} 
+		academicYear={academicYear}
+		waliKelasData={waliKelasData}
+		teacherData={teacherData}
+		staffData={staffData}
+		user={sessionUser}
+	/>
+
+</Layout>

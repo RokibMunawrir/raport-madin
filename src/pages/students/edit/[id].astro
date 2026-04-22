@@ -1,0 +1,104 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import EditStudent from "../../../components/student/EditStudent";
+import { getStudentById, updateStudent } from "../../../db/queries/students";
+import { addStudentPlacement, updateStudentPlacement } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { dormitories, classrooms, academicYears, studentClassrooms } from "../../../db/schema";
+import { eq, and } from "drizzle-orm";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+const { id } = Astro.params;
+
+if (!id) {
+    return Astro.redirect("/students");
+}
+
+// 1. Fetch Necessary Data
+const student = await getStudentById(id);
+if (!student) {
+    return Astro.redirect("/students");
+}
+
+const dormsResult = await db.select().from(dormitories).orderBy(dormitories.name);
+const allDormitories = dormsResult.map(d => ({
+    ...d,
+    roomCode: d.roomCode ?? undefined,
+}));
+const allClassrooms = await db.select().from(classrooms).orderBy(classrooms.name);
+const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
+
+// 2. Handle POST Actions
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        
+        const updateData = {
+            nis: formData.get("nis") as string,
+            name: formData.get("name") as string,
+            gender: formData.get("gender") as string,
+            birthPlace: formData.get("birthPlace") as string,
+            birthDate: formData.get("birthDate") as string,
+            address: formData.get("address") as string,
+            province: formData.get("province") as string,
+            regency: formData.get("regency") as string,
+            district: formData.get("district") as string,
+            village: formData.get("village") as string,
+            parentName: formData.get("parentName") as string,
+            phone: formData.get("phone") as string,
+            dormitoryId: formData.get("dormitoryId") as string || null,
+            roomCode: formData.get("roomCode") as string || null,
+            status: formData.get("status") as string,
+        };
+
+        const classroomId = formData.get("classroomId") as string;
+
+        // Update core student data
+        await updateStudent(id, updateData);
+
+        // Handle classroom placement update
+        if (classroomId && activeYear[0]) {
+            // Check if there's already a placement for this student in the active academic year
+            const existingPlacement = await db.select()
+                .from(studentClassrooms)
+                .where(and(
+                    eq(studentClassrooms.studentId, id),
+                    eq(studentClassrooms.academicYearId, activeYear[0].id)
+                ))
+                .limit(1);
+
+            if (existingPlacement.length > 0) {
+                // Update existing placement
+                await updateStudentPlacement(existingPlacement[0].id, { classroomId });
+            } else {
+                // Create new placement
+                await addStudentPlacement({
+                    studentId: id,
+                    classroomId: classroomId,
+                    academicYearId: activeYear[0].id,
+                });
+            }
+        }
+
+        return Astro.redirect("/students?toast=updated");
+    } catch (e) {
+        console.error("Error updating student:", e);
+    }
+}
+---
+
+<Layout title={`Edit ${student.name} - Raport Madin`}>
+    <EditStudent 
+        client:only="react" 
+        student={student}
+        dormitories={allDormitories} 
+        classrooms={allClassrooms}
+        activeYear={activeYear[0]}
+        user={sessionUser}
+    />
+</Layout>

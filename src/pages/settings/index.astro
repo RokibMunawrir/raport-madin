@@ -1,0 +1,12 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import SettingsProfile from '../../components/admin/settings';
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+---
+
+<Layout>
+  <SettingsProfile client:only="react" user={sessionUser} />
+</Layout>
+

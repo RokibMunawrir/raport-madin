@@ -1,0 +1,68 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import SubjectManagement from "../../../components/data/subject.tsx";
+import { addSubject, updateSubject, deleteSubject } from "../../../db/queries/masterData";
+import { db } from "../../../db";
+import { subjects } from "../../../db/schema";
+import { desc } from "drizzle-orm";
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+const sessionUser = user as any;
+
+
+// 1. Handle POST Actions (PRG Pattern)
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const action = formData.get("_action") as string;
+        const id = formData.get("id") as string;
+        
+        let successStatus = "";
+
+        if (action === "add_subject") {
+            await addSubject({
+                name: formData.get("name") as string,
+                code: formData.get("code") as string,
+                category: formData.get("category") as string,
+                description: formData.get("description") as string,
+                level: formData.get("level") as string,
+                status: "Aktif",
+            });
+            successStatus = "created";
+        } else if (action === "update_subject") {
+            await updateSubject(id, {
+                name: formData.get("name") as string,
+                code: formData.get("code") as string,
+                category: formData.get("category") as string,
+                description: formData.get("description") as string,
+                level: formData.get("level") as string,
+            });
+            successStatus = "updated";
+        } else if (action === "delete_subject") {
+            await deleteSubject(id);
+            successStatus = "deleted";
+        }
+
+        if (successStatus) {
+            const currentUrl = new URL(Astro.request.url);
+            currentUrl.searchParams.set("toast", successStatus);
+            return Astro.redirect(currentUrl.toString());
+        }
+    } catch (e) {
+        console.error("Error processing subject action:", e);
+    }
+}
+
+// 2. Fetch All Subjects
+const allSubjects = await db.select().from(subjects).orderBy(subjects.name);
+
+---
+
+<Layout title="Subject | Admin Panel" activeItem="Mata Pelajaran">
+    <SubjectManagement 
+        client:only="react" 
+        initialSubjects={allSubjects}
+        user={sessionUser}
+    />
+
+</Layout>
