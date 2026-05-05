@@ -13,6 +13,7 @@ export default defineConfig({
   adapter: vercel(),
   integrations: [react()],
   vite: {
-    plugins: [tailwindcss()],
+    // @ts-ignore
+    plugins: [...tailwindcss()],
   },
 });
