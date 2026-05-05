@@ -49,6 +49,7 @@ interface TeachingAssignment {
   class: SchoolClass;
   day: string;
   period: string;
+  session: number;
 }
 interface TeachingManagementProps {
   initialData: TeachingAssignment[];
@@ -256,7 +257,7 @@ const TeachingManagement: React.FC<TeachingManagementProps> = ({
                         </div>
                         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
                           <Clock size={12} className="text-slate-400" />
-                          <span>{assignment.period}</span>
+                          <span>{assignment.period} (Jam Ke-{assignment.session})</span>
                         </div>
                       </div>
                     </td>
@@ -443,6 +444,24 @@ const TeachingManagement: React.FC<TeachingManagementProps> = ({
                         className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all text-sm font-bold dark:text-slate-200" 
                         placeholder="07:30 - 09:00" 
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] pl-1">Sesi (Jam Ke)</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[1, 2, 3].map((num) => (
+                        <label key={num} className="relative flex items-center justify-center p-4 border border-slate-200 dark:border-slate-700 rounded-2xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all has-[:checked]:bg-indigo-600 has-[:checked]:border-indigo-600 has-[:checked]:text-white group">
+                          <input 
+                            type="radio" 
+                            name="session" 
+                            value={num} 
+                            defaultChecked={editingAssignment?.session === num || (!editingAssignment && num === 1)}
+                            className="sr-only" 
+                          />
+                          <span className="text-sm font-black uppercase tracking-widest">Jam {num}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 </div>

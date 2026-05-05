@@ -66,7 +66,7 @@ export async function getFullStudentReportData(studentId: string, academicYearId
   const attendanceData = await db
     .select({
       status: attendances.status,
-      count: sql<number>`count(${attendances.id})`
+      count: sql<number>`count(distinct ${attendances.date})`
     })
     .from(attendances)
     .where(and(
@@ -118,4 +118,22 @@ export async function getFullStudentReportData(studentId: string, academicYearId
     achievements: studentAchievements,
     headmaster: headmaster || { name: 'Drs. H. Mulyadi, M.Pd', nip: '197001011995011001' } // Placeholder if none found
   };
+}
+
+export async function getFullClassReportData(classroomId: string, academicYearId: string) {
+  const studentsInClass = await db
+    .select({ id: students.id })
+    .from(students)
+    .innerJoin(studentClassrooms, eq(students.id, studentClassrooms.studentId))
+    .where(and(
+      eq(studentClassrooms.classroomId, classroomId),
+      eq(studentClassrooms.academicYearId, academicYearId)
+    ));
+
+  const reports = [];
+  for (const s of studentsInClass) {
+    const report = await getFullStudentReportData(s.id, academicYearId);
+    if (report) reports.push(report);
+  }
+  return reports;
 }

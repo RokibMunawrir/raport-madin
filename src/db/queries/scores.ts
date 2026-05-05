@@ -1,6 +1,6 @@
 import { db } from "../index";
-import { students, studentClassrooms, scores, studentNotes, subjects, activityLogs } from "../schema";
-import { eq, and, sql } from "drizzle-orm";
+import { students, studentClassrooms, scores, studentNotes, activityLogs } from "../schema";
+import { eq, and } from "drizzle-orm";
 
 export async function getGradingData(academicYearId: string, subjectId: string, classroomId: string) {
   // 1. Get all students in the class

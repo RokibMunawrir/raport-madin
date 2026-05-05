@@ -151,7 +151,11 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const handleExport = async () => {
     try {
       setIsExporting(true);
-      const response = await fetch('/api/teachers/export');
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('search', searchQuery);
+      if (statusFilter !== 'All') params.set('status', statusFilter);
+      
+      const response = await fetch(`/api/teachers/export?${params.toString()}`);
       if (!response.ok) throw new Error('Gagal mengekspor data');
       
       const blob = await response.blob();

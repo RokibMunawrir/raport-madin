@@ -173,7 +173,10 @@ export async function getTeacherDashboardData(teacherId: string) {
       classroom: classrooms.name,
       subject: subjects.name,
       level: classrooms.level,
-      category: subjects.category
+      category: subjects.category,
+      day: teachingAssignments.day,
+      period: teachingAssignments.period,
+      session: teachingAssignments.session
     })
     .from(teachingAssignments)
     .innerJoin(classrooms, eq(teachingAssignments.classroomId, classrooms.id))

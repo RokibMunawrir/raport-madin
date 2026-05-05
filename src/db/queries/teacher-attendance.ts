@@ -16,6 +16,7 @@ export async function getTeacherAttendanceByDateAndClass(dateStr: string, classr
       academicYearId: teachingAssignments.academicYearId,
       day: teachingAssignments.day,
       period: teachingAssignments.period,
+      session: teachingAssignments.session,
     })
     .from(teachingAssignments)
     .innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id))

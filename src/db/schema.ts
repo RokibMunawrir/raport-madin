@@ -137,6 +137,7 @@ export const teachingAssignments = pgTable("teaching_assignments", {
   academicYearId: varchar("academic_year_id", { length: 21 }).references(() => academicYears.id),
   day: varchar("day", { length: 20 }), // Senin, Selasa, etc.
   period: varchar("period", { length: 50 }), // e.g., "07:30 - 09:00"
+  session: integer("session"), // 1, 2, or 3
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

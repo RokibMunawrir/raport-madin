@@ -2,12 +2,32 @@ import type { APIRoute } from 'astro';
 import * as xlsx from 'xlsx';
 import { db } from '../../../db';
 import { teachers } from '../../../db/schema';
-import { desc } from 'drizzle-orm';
+import { desc, eq, and, or, like } from 'drizzle-orm';
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ url }) => {
   try {
-    // 1. Fetch all teachers
-    const data = await db.select().from(teachers).orderBy(desc(teachers.createdAt));
+    const search = url.searchParams.get("search") || "";
+    const statusFilter = url.searchParams.get("status") || "All";
+
+    const filters = [];
+    if (search) {
+      filters.push(or(
+        like(teachers.name, `%${search}%`),
+        like(teachers.nip, `%${search}%`)
+      ));
+    }
+    if (statusFilter !== 'All') {
+      filters.push(eq(teachers.status, statusFilter));
+    }
+
+    const filterQuery = filters.length > 0 ? and(...filters) : undefined;
+
+    // 1. Fetch teachers with filters
+    const data = await db
+      .select()
+      .from(teachers)
+      .where(filterQuery)
+      .orderBy(desc(teachers.createdAt));
 
     // 2. Map data for Excel
     const rows = data.map(t => ({

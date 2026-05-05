@@ -11,8 +11,13 @@ import {
   Printer,
   Check,
   Loader2,
-  BookOpen
+  BookOpen,
+  FileText,
+  Layout
 } from 'lucide-react';
+import Modal from '../ui/modal';
+
+import kop from '../../assets/kop.png';
 
 import AdminPanel from '../ui/panel';
 import { toast } from '../ui/notification';
@@ -31,6 +36,7 @@ interface TeacherAssignment {
     academicYearId: string;
     day: string;
     period: string;
+    session?: number;
 }
 
 type DailyPresence = [PresenceStatus, PresenceStatus, PresenceStatus];
@@ -42,6 +48,9 @@ interface TeacherPresenceData {
 interface Classroom {
   id: string;
   name: string;
+  teacherId?: string | null;
+  teacherName?: string | null;
+  teacherNip?: string | null;
 }
 
 interface TeacherPresenceProps {
@@ -125,24 +134,29 @@ const TeacherPresenceItem: React.FC<{
       </td>
       <td className="px-6 py-4">
         <div className="flex flex-wrap 2xl:flex-nowrap items-center justify-center gap-4 lg:gap-6">
-          {[0, 1, 2].map((hourIndex) => (
-            <div key={hourIndex} className="flex flex-col items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Jam Ke-{hourIndex + 1}</p>
-              <div className="flex items-center gap-1.5">
-                {(['H', 'I', 'S', 'A'] as PresenceStatus[]).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => onStatusChange(hourIndex, s)}
-                    className={`${commonBtnClass} ${status[hourIndex] === s ? statusConfig[s].active : statusConfig[s].inactive}`}
-                    title={s === 'H' ? 'Hadir' : s === 'I' ? 'Izin' : s === 'S' ? 'Sakit' : 'Alpa'}
-                  >
-                    {statusConfig[s].label}
-                  </button>
-                ))}
+          {[0, 1, 2].map((hourIndex) => {
+            const isAssigned = assignment.session === (hourIndex + 1);
+            return (
+              <div key={hourIndex} className={`flex flex-col items-center gap-1.5 p-2 ${isAssigned ? 'bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/30 ring-2 ring-indigo-500/10' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-700/50 opacity-60'} rounded-2xl border shadow-sm transition-all`}>
+                <p className={`text-[9px] font-black uppercase tracking-widest ${isAssigned ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
+                  Jam Ke-{hourIndex + 1} {isAssigned && "(Wajib)"}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {(['H', 'I', 'S', 'A'] as PresenceStatus[]).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => onStatusChange(hourIndex, s)}
+                      className={`${commonBtnClass} ${status[hourIndex] === s ? statusConfig[s].active : statusConfig[s].inactive}`}
+                      title={s === 'H' ? 'Hadir' : s === 'I' ? 'Izin' : s === 'S' ? 'Sakit' : 'Alpa'}
+                    >
+                      {statusConfig[s].label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </td>
     </tr>
@@ -164,6 +178,35 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [presence, setPresence] = useState<TeacherPresenceData>(initialPresence);
   const [loading, setLoading] = useState(false);
+
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printType, setPrintType] = useState<'daily' | 'weekly' | 'monthly' | 'semester'>('daily');
+  const [rekapData, setRekapData] = useState<any>(null);
+  const [isFetchingRekap, setIsFetchingRekap] = useState(false);
+
+  const handlePrint = async () => {
+    if (printType === 'daily') {
+      window.print();
+      setIsPrintModalOpen(false);
+    } else {
+      setIsFetchingRekap(true);
+      try {
+        const response = await fetch(`/api/presence/rekap?classId=${classId}&type=${printType}&date=${date}&userType=teacher`);
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        
+        setRekapData(data);
+        setTimeout(() => {
+          window.print();
+          setIsFetchingRekap(false);
+          setIsPrintModalOpen(false);
+        }, 500);
+      } catch (error) {
+        toast.error('Gagal mengambil data rekap');
+        setIsFetchingRekap(false);
+      }
+    }
+  };
 
   // Sync state with props when they change
   useEffect(() => {
@@ -275,6 +318,7 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
   };
 
   return (
+    <>
     <AdminPanel title="Keaktifan Asatidz" activeItem="Keaktifan Asatidz" user={user}>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mt-5">
@@ -342,7 +386,12 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
                 <CheckCircle size={16} />
                 <span>Semua Hadir</span>
                 </button>
-                <button type="button" className="p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" title="Cetak Presensi">
+                <button 
+                  type="button" 
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95" 
+                  title="Cetak Presensi"
+                >
                 <Printer size={18} />
                 </button>
                 <button 
@@ -415,6 +464,372 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
         </div>
       </div>
     </AdminPanel>
+
+    {/* Printable Area */}
+    <div id="presence-teacher-print" className="hidden print:block bg-white text-black p-[10mm] font-serif text-[11pt] leading-tight min-h-screen">
+        {/* Header */}
+        <div className="text-center mb-6 border-b-2 border-black pb-4">
+          <img src={kop.src} alt="kop" className="w-full h-auto mb-2" />
+          <h1 className="text-xl font-bold uppercase">Rekapitulasi Kehadiran Asatidz</h1>
+          <p className="text-sm font-bold">Madrasah Diniyah Takmiliyyah Al Amiriyyah</p>
+        </div>
+
+        {/* Info */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="space-y-1">
+            <div className="flex">
+              <span className="w-24">Kelas</span>
+              <span className="mr-2">:</span>
+              <span className="font-bold">{classrooms.find(c => c.id === classId)?.name || '-'}</span>
+            </div>
+            <div className="flex">
+              <span className="w-24">Tanggal</span>
+              <span className="mr-2">:</span>
+              <span>{new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Table */}
+        <table className="w-full border-collapse border border-black text-[10pt]">
+          <thead>
+            <tr className="bg-slate-50">
+              <th className="border border-black px-2 py-2 w-10 text-center">No</th>
+              <th className="border border-black px-4 py-2 text-left">Nama Pengajar</th>
+              <th className="border border-black px-4 py-2 text-left">Mata Pelajaran</th>
+              <th className="border border-black px-4 py-2 text-center">Jadwal</th>
+              <th colSpan={3} className="border border-black px-4 py-2 text-center">Keaktifan (Jam Ke-)</th>
+            </tr>
+            <tr className="bg-slate-50 text-[9pt]">
+              <th colSpan={4} className="border border-black px-2 py-1"></th>
+              <th className="border border-black px-2 py-1 w-12 text-center">1</th>
+              <th className="border border-black px-2 py-1 w-12 text-center">2</th>
+              <th className="border border-black px-2 py-1 w-12 text-center">3</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAssignments.map((a, index) => {
+              const key = getAssignmentKey(a.teacherId, a.subjectId);
+              return (
+                <tr key={a.id}>
+                  <td className="border border-black px-2 py-2 text-center">{index + 1}</td>
+                  <td className="border border-black px-4 py-2 uppercase font-medium">{a.teacherName}</td>
+                  <td className="border border-black px-4 py-2">{a.subjectName}</td>
+                  <td className="border border-black px-4 py-2 text-center text-[9pt]">{a.day}, {a.period}</td>
+                  <td className="border border-black px-2 py-2 text-center font-bold">{presence[key]?.[0] || 'H'}</td>
+                  <td className="border border-black px-2 py-2 text-center font-bold">{presence[key]?.[1] || 'H'}</td>
+                  <td className="border border-black px-2 py-2 text-center font-bold">{presence[key]?.[2] || 'H'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {/* Stats Summary */}
+        <div className="mt-6 flex gap-8 text-[9pt]">
+          <p><span className="font-bold">H:</span> Hadir</p>
+          <p><span className="font-bold">I:</span> Izin</p>
+          <p><span className="font-bold">S:</span> Sakit</p>
+          <p><span className="font-bold">A:</span> Alpha (Tanpa Keterangan)</p>
+        </div>
+
+        {/* Signature */}
+        <div className="mt-12 grid grid-cols-2 text-center">
+          <div className="space-y-20">
+            <div>
+              <p>&nbsp;</p>
+              <p className="font-bold">Kepala Madrasah</p>
+            </div>
+            <div>
+              <p className="font-bold underline">................................................</p>
+              <p>NIPY. ....................................</p>
+            </div>
+          </div>
+          <div className="space-y-20">
+            <div>
+              <p>Banyuwangi, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="font-bold">Mustahiq / Wali Kelas</p>
+            </div>
+            <div>
+              <p className="font-bold underline">................................................</p>
+              <p>NIPY. ....................................</p>
+            </div>
+          </div>
+        </div>
+    </div>
+
+    {/* Teacher Range Printable Area (Monthly/Weekly) */}
+    {rekapData && (
+      <div id="presence-rekap-print" className="hidden print:block bg-white text-black p-[10mm] font-serif text-[10pt] leading-tight min-h-screen">
+          <div className="text-center mb-6 border-b-2 border-black pb-4">
+            <img src={kop.src} alt="kop" className="w-full h-auto mb-2" />
+            <h1 className="text-lg font-bold uppercase">Rekapitulasi Keaktifan Asatidz ({
+              printType === 'monthly' ? 'Bulanan' : 
+              printType === 'weekly' ? 'Mingguan' : 'Semester'
+            })</h1>
+            <p className="text-sm font-bold uppercase">Madrasah Diniyah Takmiliyyah Al Amiriyyah</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4 text-[9pt]">
+            <div className="space-y-1">
+              <div className="flex">
+                <span className="w-24">Kelas</span>
+                <span className="mr-2">:</span>
+                <span className="font-bold">{classrooms.find(c => c.id === classId)?.name || '-'}</span>
+              </div>
+              <div className="flex">
+                <span className="w-24">Periode</span>
+                <span className="mr-2">:</span>
+                <span>{new Date(rekapData.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} s/d {new Date(rekapData.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+            </div>
+          </div>
+
+          <table className="w-full border-collapse border border-black text-[8pt]">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="border border-black px-1 py-2 w-8 text-center">No</th>
+                <th className="border border-black px-2 py-2 text-left">Nama Pengajar</th>
+                <th className="border border-black px-2 py-2 text-left">Mata Pelajaran</th>
+                
+                {/* Mode: Mingguan/Bulanan (Daily Grid) */}
+                {printType !== 'semester' && Array.from({ length: (new Date(rekapData.endDate).getDate() - new Date(rekapData.startDate).getDate() + 1) }).map((_, i) => (
+                  <th key={i} className="border border-black px-0.5 py-2 w-6 text-center">
+                    {new Date(new Date(rekapData.startDate).getTime() + i * 24 * 60 * 60 * 1000).getDate()}
+                  </th>
+                ))}
+
+                {/* Mode: Semester (Monthly Totals) */}
+                {printType === 'semester' && (() => {
+                  const months = [];
+                  const curr = new Date(rekapData.startDate);
+                  while (curr <= new Date(rekapData.endDate)) {
+                    months.push(new Date(curr));
+                    curr.setMonth(curr.getMonth() + 1);
+                  }
+                  return months.map((m, i) => (
+                    <th key={i} className="border border-black px-1 py-2 text-center text-[7pt]">
+                      {m.toLocaleDateString('id-ID', { month: 'short' })}
+                      <div className="flex justify-between mt-1 border-t border-black/20 pt-1">
+                        <span className="w-1/4">H</span>
+                        <span className="w-1/4">I</span>
+                        <span className="w-1/4">S</span>
+                        <span className="w-1/4">A</span>
+                      </div>
+                    </th>
+                  ));
+                })()}
+
+                <th className="border border-black px-1 py-2 w-10 text-center">Total
+                  <div className="flex justify-between mt-1 border-t border-black/20 pt-1">
+                    <span className="w-1/4">H</span>
+                    <span className="w-1/4">I</span>
+                    <span className="w-1/4">S</span>
+                    <span className="w-1/4">A</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rekapData.assignments.map((a: any, index: number) => {
+                const teacherAttendance = rekapData.attendance.filter((att: any) => att.teacherId === a.teacherId && att.subjectId === a.subjectId);
+                const semesterTotals = { H: 0, I: 0, S: 0, A: 0 };
+                
+                const dailyStatuses: Record<string, string> = {};
+                teacherAttendance.forEach((att: any) => {
+                  if (!dailyStatuses[att.date]) {
+                    dailyStatuses[att.date] = att.status;
+                  } else {
+                    const order = { 'Alpha': 4, 'Sakit': 3, 'Izin': 2, 'Hadir': 1 };
+                    if (order[att.status as keyof typeof order] > order[dailyStatuses[att.date] as keyof typeof order]) {
+                      dailyStatuses[att.date] = att.status;
+                    }
+                  }
+                });
+
+                Object.values(dailyStatuses).forEach(status => {
+                  if (status === 'Hadir') semesterTotals.H++;
+                  else if (status === 'Izin') semesterTotals.I++;
+                  else if (status === 'Sakit') semesterTotals.S++;
+                  else if (status === 'Alpha') semesterTotals.A++;
+                });
+
+                return (
+                  <tr key={a.id}>
+                    <td className="border border-black px-1 py-1 text-center">{index + 1}</td>
+                    <td className="border border-black px-2 py-1 uppercase text-[7pt] font-medium truncate max-w-[120px]">{a.teacherName}</td>
+                    <td className="border border-black px-2 py-1 text-[7pt] truncate max-w-[100px]">{a.subjectName}</td>
+                    
+                    {/* Weekly/Monthly Daily Cells */}
+                    {printType !== 'semester' && Array.from({ length: Math.floor((new Date(rekapData.endDate).getTime() - new Date(rekapData.startDate).getTime()) / (1000 * 3600 * 24) + 1) }).map((_, i) => {
+                      const currentDate = new Date(new Date(rekapData.startDate).getTime() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                      const displayStatus = dailyStatuses[currentDate] || "";
+                      const statusMap: Record<string, string> = { 'Hadir': 'H', 'Izin': 'I', 'Sakit': 'S', 'Alpha': 'A' };
+
+                      return (
+                        <td key={i} className={`border border-black px-0.5 py-1 text-center text-[7pt] ${displayStatus === 'Alpha' ? 'bg-red-50' : ''}`}>
+                          {statusMap[displayStatus] || ""}
+                        </td>
+                      );
+                    })}
+
+                    {/* Semester Monthly Summaries */}
+                    {printType === 'semester' && (() => {
+                      const months = [];
+                      const curr = new Date(rekapData.startDate);
+                      while (curr <= new Date(rekapData.endDate)) {
+                        months.push(new Date(curr));
+                        curr.setMonth(curr.getMonth() + 1);
+                      }
+                      
+                      return months.map((m, i) => {
+                        const monthTotals = { H: 0, I: 0, S: 0, A: 0 };
+                        const monthKey = m.toISOString().substring(0, 7); // "YYYY-MM"
+                        
+                        Object.keys(dailyStatuses).forEach(date => {
+                          if (date.startsWith(monthKey)) {
+                            const status = dailyStatuses[date];
+                            if (status === 'Hadir') monthTotals.H++;
+                            else if (status === 'Izin') monthTotals.I++;
+                            else if (status === 'Sakit') monthTotals.S++;
+                            else if (status === 'Alpha') monthTotals.A++;
+                          }
+                        });
+
+                        return (
+                          <td key={i} className="border border-black px-1 py-1 text-center text-[7pt]">
+                            <div className="flex justify-between gap-1">
+                              <span className="w-1/4">{monthTotals.H || "-"}</span>
+                              <span className="w-1/4 text-indigo-600">{monthTotals.I || "-"}</span>
+                              <span className="w-1/4 text-amber-600">{monthTotals.S || "-"}</span>
+                              <span className="w-1/4 text-red-600 font-bold">{monthTotals.A || "-"}</span>
+                            </div>
+                          </td>
+                        );
+                      });
+                    })()}
+
+                    {/* Semester/Range Totals */}
+                    <td className="border border-black px-1 py-1 text-center bg-slate-50">
+                      <div className="flex justify-between gap-1 text-[7pt] font-black">
+                        <span className="w-1/4">{semesterTotals.H}</span>
+                        <span className="w-1/4 text-indigo-600">{semesterTotals.I}</span>
+                        <span className="w-1/4 text-amber-600">{semesterTotals.S}</span>
+                        <span className="w-1/4 text-red-600">{semesterTotals.A}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="mt-12 grid grid-cols-2 text-center text-[9pt]">
+            <div className="space-y-20">
+              <div>
+                <p>&nbsp;</p>
+                <p className="font-bold">Kepala Madrasah</p>
+              </div>
+              <div>
+                <p className="font-bold underline">................................................</p>
+                <p>NIPY. ....................................</p>
+              </div>
+            </div>
+            <div className="space-y-20">
+              <div>
+                <p>Banyuwangi, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <p className="font-bold">Mustahiq / Wali Kelas</p>
+              </div>
+              <div>
+                <p className="font-bold underline">................................................</p>
+                <p>NIPY. ....................................</p>
+              </div>
+            </div>
+          </div>
+      </div>
+    )}
+
+    {/* Teacher Print Selection Modal */}
+    <Modal
+      isOpen={isPrintModalOpen}
+      onClose={() => setIsPrintModalOpen(false)}
+      title="Opsi Cetak Keaktifan Asatidz"
+      size="xl"
+    >
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <button 
+            onClick={() => setPrintType('daily')}
+            className={`flex flex-col items-center gap-4 p-6 rounded-[2.5rem] border-2 transition-all group ${printType === 'daily' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-2xl shadow-indigo-600/10' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 bg-white dark:bg-slate-900'}`}
+          >
+            <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-transform group-hover:scale-110 duration-500 ${printType === 'daily' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'}`}>
+              <Calendar size={32} strokeWidth={2.5} />
+            </div>
+            <div className="text-center">
+              <p className={`text-lg font-black tracking-tight ${printType === 'daily' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-100'}`}>Harian</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Satu Hari</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => setPrintType('weekly')}
+            className={`flex flex-col items-center gap-4 p-6 rounded-[2.5rem] border-2 transition-all group ${printType === 'weekly' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-2xl shadow-indigo-600/10' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 bg-white dark:bg-slate-900'}`}
+          >
+            <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-transform group-hover:scale-110 duration-500 ${printType === 'weekly' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'}`}>
+              <Layout size={32} strokeWidth={2.5} />
+            </div>
+            <div className="text-center">
+              <p className={`text-lg font-black tracking-tight ${printType === 'weekly' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-100'}`}>Mingguan</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tujuh Hari</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => setPrintType('monthly')}
+            className={`flex flex-col items-center gap-4 p-6 rounded-[2.5rem] border-2 transition-all group ${printType === 'monthly' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-2xl shadow-indigo-600/10' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 bg-white dark:bg-slate-900'}`}
+          >
+            <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-transform group-hover:scale-110 duration-500 ${printType === 'monthly' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'}`}>
+              <FileText size={32} strokeWidth={2.5} />
+            </div>
+            <div className="text-center">
+              <p className={`text-lg font-black tracking-tight ${printType === 'monthly' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-100'}`}>Bulanan</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Satu Bulan</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => setPrintType('semester')}
+            className={`flex flex-col items-center gap-4 p-6 rounded-[2.5rem] border-2 transition-all group ${printType === 'semester' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-2xl shadow-indigo-600/10' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 bg-white dark:bg-slate-900'}`}
+          >
+            <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-transform group-hover:scale-110 duration-500 ${printType === 'semester' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'}`}>
+              <BookOpen size={32} strokeWidth={2.5} />
+            </div>
+            <div className="text-center">
+              <p className={`text-lg font-black tracking-tight ${printType === 'semester' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-100'}`}>Semester</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Enam Bulan</p>
+            </div>
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <button 
+            onClick={() => setIsPrintModalOpen(false)}
+            className="flex-1 px-8 py-4.5 rounded-[1.5rem] text-sm font-black text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 border border-slate-100 dark:border-slate-800 transition-all active:scale-95"
+          >
+            Batalkan
+          </button>
+          <button 
+            onClick={handlePrint}
+            disabled={isFetchingRekap}
+            className="flex-[2] flex items-center justify-center gap-3 px-8 py-4.5 bg-indigo-600 text-white rounded-[1.5rem] text-sm font-black hover:bg-indigo-700 shadow-2xl shadow-indigo-600/30 transition-all transform active:scale-[0.98] disabled:opacity-50"
+          >
+            {isFetchingRekap ? <Loader2 className="animate-spin" size={22} /> : <Printer size={22} strokeWidth={2.5} />}
+            <span>Konfirmasi & Cetak Laporan</span>
+          </button>
+        </div>
+      </div>
+    </Modal>
+</>
   );
 };
 

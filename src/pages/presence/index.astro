@@ -2,9 +2,9 @@
 import Layout from "../../layouts/Layout.astro";
 import PresenceManagement from "../../components/admin/presence";
 import { db } from "../../db";
-import { classrooms, academicYears } from "../../db/schema";
+import { classrooms, academicYears, teachers } from "../../db/schema";
 import { getAttendanceByDateAndClass, saveBulkAttendance } from "../../db/queries/attendance";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
@@ -14,9 +14,18 @@ const userRole = sessionUser.role;
 const userTeacherId = sessionUser.teacherId;
 
 // 1. Fetch Master Data
-const allClasses = await db.select().from(classrooms)
-    .where(userRole === 'Guru' && userTeacherId ? eq(classrooms.teacherId, userTeacherId) : undefined)
-    .orderBy(classrooms.name);
+const allClasses = await db.select({
+    id: classrooms.id,
+    name: classrooms.name,
+    level: classrooms.level,
+    teacherId: classrooms.teacherId,
+    teacherName: teachers.name,
+    teacherNip: teachers.nip
+})
+.from(classrooms)
+.leftJoin(teachers, eq(classrooms.teacherId, teachers.id))
+.where(userRole === 'Guru' && userTeacherId ? eq(classrooms.teacherId, userTeacherId) : undefined)
+.orderBy(classrooms.name);
 
 const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, 1)).limit(1);
 

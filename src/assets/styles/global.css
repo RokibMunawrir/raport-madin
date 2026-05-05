@@ -35,11 +35,19 @@
     #print-report,
     #print-report *,
     #individual-report,
-    #individual-report * {
+    #individual-report *,
+    #class-report-print,
+    #class-report-print *,
+    #presence-print,
+    #presence-print *,
+    #presence-rekap-print,
+    #presence-rekap-print *,
+    #presence-teacher-print,
+    #presence-teacher-print * {
         visibility: visible;
     }
 
-    #print-report, #individual-report {
+    #print-report, #individual-report, #class-report-print, #presence-print, #presence-teacher-print, #presence-rekap-print {
         position: absolute;
         top: 0;
         left: 0;
@@ -48,11 +56,32 @@
         display: block !important;
     }
 
-    /* Individual Report is Portrait A4 */
-    #individual-report {
+    /* Individual Report & Presence are Portrait A4 */
+    #individual-report, #presence-print, #presence-teacher-print {
         width: 210mm;
         min-height: 297mm;
         margin: 0 auto;
+    }
+
+    /* Rekap Print is Landscape A4 */
+    #presence-rekap-print {
+        width: 297mm;
+        min-height: 210mm;
+        margin: 0 auto;
+    }
+
+    #class-report-print {
+        width: 100%;
+    }
+
+    #class-report-print .print-page-wrapper {
+        page-break-after: always;
+        break-after: page;
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto;
+        box-sizing: border-box;
+        position: relative;
     }
 
     /* Class Report is Landscape A4 */

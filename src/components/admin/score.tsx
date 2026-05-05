@@ -15,12 +15,8 @@ import {
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import { toast } from '../ui/notification';
+import IndividualReport from '../student/IndividualReport';
 
-// --- Types ---
-interface SubjectScore {
-  harian: number;
-  semester: number;
-}
 
 interface StudentScore {
   id: string;
@@ -58,6 +54,7 @@ interface ScoreManagementProps {
   selectedSubjectId: string;
   selectedClassId: string;
   user?: any;
+  classReports?: any[];
 }
 
 
@@ -83,7 +80,8 @@ const ScoreManagement: React.FC<ScoreManagementProps> = ({
     selectedYearId, 
     selectedSubjectId, 
     selectedClassId,
-    user
+    user,
+    classReports
 }) => {
 
   const [studentScores, setStudentScores] = useState<StudentScore[]>(initialStudentScores);
@@ -188,6 +186,8 @@ const ScoreManagement: React.FC<ScoreManagementProps> = ({
   const currentYearLabel = currentYear ? `${currentYear.name} — Semester ${currentYear.semester}` : '-';
 
   const handlePrint = () => {
+    const fullPrint = document.getElementById('class-report-print');
+    if(fullPrint) fullPrint.style.display = 'block';
     window.print();
   };
 
@@ -298,11 +298,12 @@ const ScoreManagement: React.FC<ScoreManagementProps> = ({
               <button
                 type="button"
                 onClick={handlePrint}
-                disabled={filteredScores.length === 0}
-                className="p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400 dark:hover:border-indigo-500/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                title="Cetak Laporan Nilai PDF"
+                disabled={!classReports || classReports.length === 0}
+                className="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black hover:bg-slate-50 dark:hover:bg-slate-700 transition-all transform active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Cetak Laporan Pembelajaran Kelas"
               >
-                <Printer size={18} />
+                <Printer size={18} className="text-indigo-600" />
+                <span>Cetak Laporan</span>
               </button>
               <button 
                 type="button"
@@ -426,111 +427,13 @@ const ScoreManagement: React.FC<ScoreManagementProps> = ({
         </div>
       </div>
 
-      {/* ===== PRINTABLE REPORT AREA (hidden on screen, visible on print) ===== */}
-      <div id="print-report" style={{ display: 'none' }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '3px double #312e81', paddingBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '8px' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: 'white', fontSize: '28px', fontWeight: 900 }}>R</span>
-            </div>
-            <div style={{ textAlign: 'left' }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Madrasah Diniyah</p>
-              <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#1e1b4b', margin: '2px 0' }}>Raport Madin</h1>
-              <p style={{ fontSize: '10px', color: '#9ca3af', margin: 0 }}>Sistem Informasi Akademik Madrasah</p>
-            </div>
+      {/* ===== PRINTABLE CLASS REPORT AREA (hidden on screen, visible on print) ===== */}
+      <div id="class-report-print" style={{ display: 'none' }}>
+        {classReports && classReports.map((report) => (
+          <div key={report.student.id} className="print-page-wrapper">
+            <IndividualReport data={report} isPrintWrapper={false} />
           </div>
-          <div style={{ background: '#f0f0ff', borderRadius: '12px', padding: '10px 24px', display: 'inline-block', marginTop: '12px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 900, color: '#3730a3', margin: 0 }}>LAPORAN NILAI HASIL BELAJAR SANTRI</p>
-          </div>
-        </div>
-
-        {/* Meta Info */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-          {[
-            { label: 'Kelas', value: currentClassName },
-            { label: 'Mata Pelajaran', value: currentSubjectName },
-            { label: 'Tahun Ajaran / Semester', value: currentYearLabel },
-          ].map(item => (
-            <div key={item.label} style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px 14px', borderLeft: '4px solid #4f46e5' }}>
-              <p style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 4px 0' }}>{item.label}</p>
-              <p style={{ fontSize: '13px', fontWeight: 800, color: '#1e293b', margin: 0 }}>{item.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Score Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '20px' }}>
-          <thead>
-            <tr style={{ background: '#312e81', color: 'white' }}>
-              {['No', 'Nama Santri', 'NISN', 'Nilai Harian (50%)', 'Nilai Semester (50%)', 'Nilai Akhir', 'Grade', 'Catatan Wali Kelas'].map(h => (
-                <th key={h} style={{ padding: '10px 12px', textAlign: h === 'No' ? 'center' : (h === 'Nama Santri' || h === 'Catatan Wali Kelas') ? 'left' : 'center', fontWeight: 800, letterSpacing: '0.05em', fontSize: '9px', textTransform: 'uppercase' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredScores.map((s, i) => {
-              const final = calculateFinal(s.harian, s.semester);
-              const grade = getGrade(final);
-              const isOdd = i % 2 === 0;
-              return (
-                <tr key={s.id} style={{ background: isOdd ? '#ffffff' : '#f8f9ff', borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{i + 1}</td>
-                  <td style={{ padding: '9px 12px', fontWeight: 700, color: '#1e293b' }}>{s.name}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', color: '#64748b', fontFamily: 'monospace' }}>{s.nisn}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#3730a3' }}>{s.harian}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#3730a3' }}>{s.semester}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 900, fontSize: '14px', color: final >= 70 ? '#1e293b' : '#ef4444' }}>{final}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: '6px', fontWeight: 900, fontSize: '11px', background: grade.label === 'A' ? '#d1fae5' : grade.label === 'B' ? '#e0e7ff' : grade.label === 'C' ? '#fef3c7' : '#fee2e2', color: grade.label === 'A' ? '#065f46' : grade.label === 'B' ? '#3730a3' : grade.label === 'C' ? '#92400e' : '#991b1b' }}>
-                      {grade.label}
-                    </span>
-                  </td>
-                  <td style={{ padding: '9px 12px', color: '#64748b', fontSize: '10px', fontStyle: s.note ? 'normal' : 'italic' }}>{s.note || '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {/* Stats Summary + Signature */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '16px' }}>
-          {/* Stats */}
-          <div style={{ background: '#f0f0ff', borderRadius: '12px', padding: '16px' }}>
-            <p style={{ fontSize: '10px', fontWeight: 800, color: '#4338ca', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '12px', borderBottom: '1px solid #c7d2fe', paddingBottom: '8px' }}>Rekap Statistik</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {[
-                { label: 'Total Santri', value: filteredScores.length },
-                { label: 'Rata-rata Kelas', value: stats.avg },
-                { label: 'Nilai Tertinggi', value: stats.top },
-                { label: 'Perlu Remedial', value: stats.remedial },
-              ].map(item => (
-                <div key={item.label} style={{ background: 'white', padding: '10px', borderRadius: '8px' }}>
-                  <p style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', margin: '0 0 2px 0' }}>{item.label}</p>
-                  <p style={{ fontSize: '18px', fontWeight: 900, color: '#1e1b4b', margin: 0 }}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Signature */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div></div>
-            <div style={{ textAlign: 'center', minWidth: '200px' }}>
-              <p style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>Mengetahui,</p>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#374151', marginBottom: '60px' }}>Wali Kelas {currentClassName}</p>
-              <div style={{ borderTop: '1px solid #374151', paddingTop: '6px' }}>
-                <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>( _____________________________ )</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{ marginTop: '24px', borderTop: '1px dashed #c7d2fe', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: '9px', color: '#94a3b8', margin: 0 }}>Dicetak oleh Sistem Raport Madin • {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-          <p style={{ fontSize: '9px', color: '#c7d2fe', margin: 0 }}>★ A ≥90  ★ B ≥80  ★ C ≥70  ★ D &lt;70</p>
-        </div>
+        ))}
       </div>
     </AdminPanel>
   );

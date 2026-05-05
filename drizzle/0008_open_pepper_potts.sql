@@ -1,0 +1,1 @@
+ALTER TABLE "teaching_assignments" ADD COLUMN "session" integer;

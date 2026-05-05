@@ -23,6 +23,7 @@ if (Astro.request.method === "POST") {
             classroomId: formData.get("classroomId") as string,
             day: formData.get("day") as string,
             period: formData.get("period") as string,
+            session: parseInt(formData.get("session") as string) || 1,
         };
 
         let successStatus = "";
@@ -100,6 +101,7 @@ const assignmentResults = await db
         classLevel: classrooms.level,
         day: teachingAssignments.day,
         period: teachingAssignments.period,
+        session: teachingAssignments.session,
     })
     .from(teachingAssignments)
     .leftJoin(teachers, eq(teachingAssignments.teacherId, teachers.id))
@@ -118,6 +120,7 @@ const initialData = assignmentResults.map(a => ({
     class: { id: a.classId, name: a.className ?? "Kelas Tidak Diketahui", level: a.classLevel },
     day: a.day || "-",
     period: a.period || "-",
+    session: a.session || 1,
 }));
 
 ---

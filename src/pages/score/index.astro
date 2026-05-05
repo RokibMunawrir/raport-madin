@@ -4,6 +4,7 @@ import ScoreManagement from "../../components/admin/score";
 import { db } from "../../db";
 import { classrooms, academicYears, subjects } from "../../db/schema";
 import { getGradingData, saveBulkGrading } from "../../db/queries/scores";
+import { getFullClassReportData } from "../../db/queries/reports";
 import { eq } from "drizzle-orm";
 
 const user = Astro.locals.user;
@@ -45,6 +46,11 @@ if (selectedYearId && selectedSubjectId && selectedClassId) {
     });
 }
 
+let classReports: any[] = [];
+if (selectedYearId && selectedClassId) {
+    classReports = await getFullClassReportData(selectedClassId, selectedYearId);
+}
+
 // 4. Handle POST Actions
 if (Astro.request.method === "POST") {
     try {
@@ -73,6 +79,7 @@ if (Astro.request.method === "POST") {
         selectedSubjectId={selectedSubjectId}
         selectedClassId={selectedClassId}
         user={sessionUser}
+        classReports={classReports}
     />
 
 </Layout>
