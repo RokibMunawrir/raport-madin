@@ -19,7 +19,7 @@ export const GET: APIRoute = async () => {
       'Kabupaten/Kota',
       'Provinsi',
       'Kode Kamar Asrama', // e.g. "A.01"
-      'Status (Aktif/Alumni/Keluar)'
+      'Status (Aktif/Alumni/Drop Out/Keluar)'
     ];
 
     // 2. Add an example row to guide the user

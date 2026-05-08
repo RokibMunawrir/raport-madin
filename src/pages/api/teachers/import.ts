@@ -34,41 +34,82 @@ export const POST: APIRoute = async ({ request }) => {
 
     const dataRows = rawData.slice(1);
     const teachersToInsert: any[] = [];
+    const importErrors: { row: number; column: string; message: string }[] = [];
 
-    for (const row of dataRows) {
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      const rowIndex = i + 2;
+
       const name = row[0] ? String(row[0]).trim() : null;
+      const gender = row[2] ? String(row[2]).trim() : null;
+      const status = row[12] ? String(row[12]).trim() : 'Aktif';
 
-      if (!name) continue;
+      if (!name) {
+        importErrors.push({ row: rowIndex, column: 'Nama Lengkap', message: 'Nama wajib diisi' });
+      }
+      if (gender && !['Laki-laki', 'Perempuan'].includes(gender)) {
+        importErrors.push({ row: rowIndex, column: 'Jenis Kelamin', message: 'Gunakan "Laki-laki" atau "Perempuan"' });
+      }
+      if (status && !['Aktif', 'Cuti', 'Non-Aktif'].includes(status)) {
+        importErrors.push({ row: rowIndex, column: 'Status', message: 'Status tidak valid' });
+      }
 
       let bDate = null;
-      if (row[7]) {
-        const ds = String(row[7]).trim();
-        if (!isNaN(Date.parse(ds))) bDate = new Date(ds).toISOString().split('T')[0];
+      if (row[11]) {
+        const ds = String(row[11]).trim();
+        if (!isNaN(Date.parse(ds))) {
+          bDate = new Date(ds).toISOString().split('T')[0];
+        } else {
+          importErrors.push({ row: rowIndex, column: 'Tanggal Lahir', message: 'Format tanggal salah (YYYY-MM-DD)' });
+        }
       }
 
       let jDate = null;
-      if (row[9]) {
-        const ds = String(row[9]).trim();
-        if (!isNaN(Date.parse(ds))) jDate = new Date(ds).toISOString().split('T')[0];
+      if (row[13]) {
+        const ds = String(row[13]).trim();
+        if (!isNaN(Date.parse(ds))) {
+          jDate = new Date(ds).toISOString().split('T')[0];
+        } else {
+          importErrors.push({ row: rowIndex, column: 'Tanggal Bergabung', message: 'Format tanggal salah (YYYY-MM-DD)' });
+        }
       }
 
-      teachersToInsert.push({
-        id: nanoid(),
-        name: name,
-        nip: row[1] ? String(row[1]).trim() : null,
-        gender: row[2] ? String(row[2]).trim() : null,
-        phone: row[3] ? String(row[3]).trim() : null,
-        email: row[4] ? String(row[4]).trim() : null,
-        address: row[5] ? String(row[5]).trim() : null,
-        birthPlace: row[6] ? String(row[6]).trim() : null,
-        birthDate: bDate,
-        status: row[8] ? String(row[8]).trim() : 'Aktif',
-        joinedDate: jDate,
+      if (importErrors.length >= 20) break;
+
+      const hasRowError = importErrors.some(e => e.row === rowIndex);
+      if (!hasRowError && name) {
+        teachersToInsert.push({
+          id: nanoid(),
+          name: name,
+          nip: row[1] ? String(row[1]).trim() : null,
+          gender: gender,
+          phone: row[3] ? String(row[3]).trim() : null,
+          email: row[4] ? String(row[4]).trim() : null,
+          address: row[5] ? String(row[5]).trim() : null,
+          village: row[6] ? String(row[6]).trim() : null,
+          district: row[7] ? String(row[7]).trim() : null,
+          regency: row[8] ? String(row[8]).trim() : null,
+          province: row[9] ? String(row[9]).trim() : null,
+          birthPlace: row[10] ? String(row[10]).trim() : null,
+          birthDate: bDate,
+          status: status,
+          joinedDate: jDate,
+        });
+      }
+    }
+
+    if (importErrors.length > 0) {
+      return new Response(JSON.stringify({ 
+        error: 'Terdapat kesalahan pada data Excel Anda', 
+        details: importErrors 
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     if (teachersToInsert.length === 0) {
-      return new Response(JSON.stringify({ error: 'Tidak ada data valid yang bisa diimport. Pastikan Nama terisi.' }), {
+      return new Response(JSON.stringify({ error: 'Tidak ada data valid yang bisa diimport.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -94,7 +135,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
 
     return new Response(JSON.stringify({ 
-      message: `Import selesai. ${successCount} data berhasil diimport.`,
+      message: `Import berhasil! ${successCount} data asatidz telah ditambahkan.`,
       successCount
     }), {
       status: 200,

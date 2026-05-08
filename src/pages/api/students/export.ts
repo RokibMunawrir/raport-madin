@@ -31,6 +31,7 @@ export const GET: APIRoute = async ({ url }) => {
     const data = await db
       .select({
         nis: students.nis,
+        nisn: students.nisn,
         name: students.name,
         gender: students.gender,
         className: classrooms.name,
@@ -39,6 +40,10 @@ export const GET: APIRoute = async ({ url }) => {
         phone: students.phone,
         status: students.status,
         address: students.address,
+        village: students.village,
+        district: students.district,
+        regency: students.regency,
+        province: students.province,
         birthPlace: students.birthPlace,
         birthDate: students.birthDate,
       })
@@ -58,6 +63,7 @@ export const GET: APIRoute = async ({ url }) => {
     // Map data for Excel
     const rows = filteredData.map(s => ({
       'NIS': s.nis,
+      'NISN': s.nisn || '-',
       'Nama Lengkap': s.name,
       'L/P': s.gender === 'Laki-laki' ? 'L' : 'P',
       'Kelas': s.className || '-',
@@ -68,6 +74,10 @@ export const GET: APIRoute = async ({ url }) => {
       'Tempat Lahir': s.birthPlace || '-',
       'Tanggal Lahir': s.birthDate || '-',
       'Alamat': s.address || '-',
+      'Desa/Kelurahan': s.village || '-',
+      'Kecamatan': s.district || '-',
+      'Kabupaten/Kota': s.regency || '-',
+      'Provinsi': s.province || '-',
     }));
 
     // Create worksheet

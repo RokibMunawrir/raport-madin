@@ -41,69 +41,84 @@ export const POST: APIRoute = async ({ request }) => {
     // The first row is the header
     const dataRows = rawData.slice(1);
     const studentsToInsert: any[] = [];
+    const importErrors: { row: number; column: string; message: string }[] = [];
 
     let successCount = 0;
     let skipCount = 0;
 
-    for (const row of dataRows) {
-      // Mapping based on template generating
-      // [0] 'NIS (Wajib)'
-      // [1] 'NISN'
-      // [2] 'Nama Lengkap (Wajib)'
-      // [3] 'Jenis Kelamin (Laki-laki/Perempuan)'
-      // [4] 'Tempat Lahir'
-      // [5] 'Tanggal Lahir (YYYY-MM-DD)'
-      // [6] 'Nomor HP Wali'
-      // [7] 'Nama Wali'
-      // [8] 'Alamat'
-      // [9] 'Desa/Kelurahan'
-      // [10] 'Kecamatan'
-      // [11] 'Kabupaten/Kota'
-      // [12] 'Provinsi'
-      // [13] 'Kode Kamar Asrama'
-      // [14] 'Status (Aktif/Alumni/Keluar)'
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      const rowIndex = i + 2; // +1 for header, +1 for 1-based indexing in Excel
 
       const nis = row[0] ? String(row[0]).trim() : null;
       const nama = row[2] ? String(row[2]).trim() : null;
+      const gender = row[3] ? String(row[3]).trim() : null;
+      const status = row[14] ? String(row[14]).trim() : 'Aktif';
 
-      if (!nis || !nama) {
-        // Skip invalid rows
-        continue;
+      // Validation
+      if (!nis) {
+        importErrors.push({ row: rowIndex, column: 'NIS', message: 'NIS wajib diisi' });
+      }
+      if (!nama) {
+        importErrors.push({ row: rowIndex, column: 'Nama Lengkap', message: 'Nama Lengkap wajib diisi' });
+      }
+      if (gender && !['Laki-laki', 'Perempuan'].includes(gender)) {
+        importErrors.push({ row: rowIndex, column: 'Jenis Kelamin', message: 'Gunakan "Laki-laki" atau "Perempuan"' });
+      }
+      if (status && !['Aktif', 'Alumni', 'Drop Out', 'Keluar'].includes(status)) {
+        importErrors.push({ row: rowIndex, column: 'Status', message: 'Status tidak valid' });
       }
 
-      // Prepare date if exists
+      // Date validation
       let birthDateObj = null;
       if (row[5]) {
          const dateString = String(row[5]).trim();
-         // Basic validation if it looks like a date
          if (!isNaN(Date.parse(dateString))) {
-           // We just want YYYY-MM-DD string for DB
            birthDateObj = new Date(dateString).toISOString().split('T')[0];
+         } else {
+           importErrors.push({ row: rowIndex, column: 'Tanggal Lahir', message: 'Format tanggal salah (YYYY-MM-DD)' });
          }
       }
 
-      studentsToInsert.push({
-        id: nanoid(),
-        nis: nis,
-        nisn: row[1] ? String(row[1]).trim() : null,
-        name: nama,
-        gender: row[3] ? String(row[3]).trim() : null,
-        birthPlace: row[4] ? String(row[4]).trim() : null,
-        birthDate: birthDateObj,
-        phone: row[6] ? String(row[6]).trim() : null,
-        parentName: row[7] ? String(row[7]).trim() : null,
-        address: row[8] ? String(row[8]).trim() : null,
-        village: row[9] ? String(row[9]).trim() : null,
-        district: row[10] ? String(row[10]).trim() : null,
-        regency: row[11] ? String(row[11]).trim() : null,
-        province: row[12] ? String(row[12]).trim() : null,
-        roomCode: row[13] ? String(row[13]).trim() : null,
-        status: row[14] ? String(row[14]).trim() : 'Aktif',
+      // If we already have too many errors, stop collecting to prevent huge response
+      if (importErrors.length >= 20) break;
+
+      // Only add to insert list if there are no errors for this row
+      const hasRowError = importErrors.some(e => e.row === rowIndex);
+      if (!hasRowError && nis && nama) {
+        studentsToInsert.push({
+          id: nanoid(),
+          nis: nis,
+          nisn: row[1] ? String(row[1]).trim() : null,
+          name: nama,
+          gender: gender,
+          birthPlace: row[4] ? String(row[4]).trim() : null,
+          birthDate: birthDateObj,
+          phone: row[6] ? String(row[6]).trim() : null,
+          parentName: row[7] ? String(row[7]).trim() : null,
+          address: row[8] ? String(row[8]).trim() : null,
+          village: row[9] ? String(row[9]).trim() : null,
+          district: row[10] ? String(row[10]).trim() : null,
+          regency: row[11] ? String(row[11]).trim() : null,
+          province: row[12] ? String(row[12]).trim() : null,
+          roomCode: row[13] ? String(row[13]).trim() : null,
+          status: status,
+        });
+      }
+    }
+
+    if (importErrors.length > 0) {
+      return new Response(JSON.stringify({ 
+        error: 'Terdapat kesalahan pada data Excel Anda', 
+        details: importErrors 
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     if (studentsToInsert.length === 0) {
-      return new Response(JSON.stringify({ error: 'Tidak ada data valid yang bisa diimport. Pastikan NIS dan Nama terisi.' }), {
+      return new Response(JSON.stringify({ error: 'Tidak ada data valid yang bisa diimport.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -133,7 +148,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
 
     return new Response(JSON.stringify({ 
-      message: `Import selesai. ${successCount} data berhasil, ${skipCount} data diskip (duplikat).`,
+      message: `Import berhasil! ${successCount} data ditambahkan, ${skipCount} data dilewati (duplikat).`,
       successCount,
       skipCount
     }), {

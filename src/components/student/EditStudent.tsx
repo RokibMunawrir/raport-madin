@@ -87,6 +87,8 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
   });
 
   const [loading, setLoading] = useState(false);
+  const [wilayahLoading, setWilayahLoading] = useState({ prov: false, reg: false, dist: false, vil: false });
+
   const combinedRoomCode = (buildingCode && roomNumber) ? `${buildingCode}.${roomNumber}` : (buildingCode || roomNumber);
 
   const handleDormitoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -99,66 +101,81 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
     }
   };
 
+  // Helper for flexible name matching
+  const matchRegionName = (listName: string, selectedName: string) => {
+    if (!listName || !selectedName) return false;
+    const clean = (s: string) => s.toUpperCase()
+      .replace(/KABUPATEN|KOTA|KECAMATAN|DESA|KELURAHAN|KAB\.|KOT\.|KEC\./g, '')
+      .replace(/\s+/g, '')
+      .trim();
+    return clean(listName) === clean(selectedName);
+  };
+
   // Fetch Provinces
   useEffect(() => {
+    setWilayahLoading(prev => ({ ...prev, prov: true }));
     fetch('/api/wilayah/provinces.json')
       .then(res => res.json())
       .then(json => setProvinces(json.data || []))
-      .catch(err => console.error("Error fetching provinces:", err));
+      .catch(err => console.error("Error fetching provinces:", err))
+      .finally(() => setWilayahLoading(prev => ({ ...prev, prov: false })));
   }, []);
 
-  // Fetch Regencies
+  // Fetch & Resolve Regencies
   useEffect(() => {
-    // Resolve Province Code if it was stored as a Name
-    if (provinces.length > 0 && selectedProvince && !selectedProvince.match(/^\d+$/)) {
-      const matched = provinces.find(p => p.name.toUpperCase() === selectedProvince.toUpperCase());
+    if (provinces.length > 0 && selectedProvince && !selectedProvince.match(/^[0-9.]+$/)) {
+      const matched = provinces.find(p => matchRegionName(p.name, selectedProvince));
       if (matched) setSelectedProvince(matched.code);
     }
 
-    if (selectedProvince && selectedProvince.match(/^\d+$/)) {
+    if (selectedProvince && selectedProvince.match(/^[0-9.]+$/)) {
+      setWilayahLoading(prev => ({ ...prev, reg: true }));
       fetch(`/api/wilayah/regencies/${selectedProvince}.json`)
         .then(res => res.json())
         .then(json => setRegencies(json.data || []))
-        .catch(() => setRegencies([]));
+        .catch(() => setRegencies([]))
+        .finally(() => setWilayahLoading(prev => ({ ...prev, reg: false })));
     }
   }, [selectedProvince, provinces]);
 
-  // Fetch Districts
+  // Fetch & Resolve Districts
   useEffect(() => {
-    // Resolve Regency Code if it was stored as a Name
-    if (regencies.length > 0 && selectedRegency && !selectedRegency.match(/^\d+$/)) {
-      const matched = regencies.find(r => r.name.toUpperCase() === selectedRegency.toUpperCase());
+    if (regencies.length > 0 && selectedRegency && !selectedRegency.match(/^[0-9.]+$/)) {
+      const matched = regencies.find(r => matchRegionName(r.name, selectedRegency));
       if (matched) setSelectedRegency(matched.code);
     }
 
-    if (selectedRegency && selectedRegency.match(/^\d+$/)) {
+    if (selectedRegency && selectedRegency.match(/^[0-9.]+$/)) {
+      setWilayahLoading(prev => ({ ...prev, dist: true }));
       fetch(`/api/wilayah/districts/${selectedRegency}.json`)
         .then(res => res.json())
         .then(json => setDistricts(json.data || []))
-        .catch(() => setDistricts([]));
+        .catch(() => setDistricts([]))
+        .finally(() => setWilayahLoading(prev => ({ ...prev, dist: false })));
     }
   }, [selectedRegency, regencies]);
 
-  // Fetch Villages
+  // Fetch & Resolve Villages
   useEffect(() => {
-    // Resolve District Code if it was stored as a Name
-    if (districts.length > 0 && selectedDistrict && !selectedDistrict.match(/^\d+$/)) {
-      const matched = districts.find(d => d.name.toUpperCase() === selectedDistrict.toUpperCase());
+    if (districts.length > 0 && selectedDistrict && !selectedDistrict.match(/^[0-9.]+$/)) {
+      const matched = districts.find(d => matchRegionName(d.name, selectedDistrict));
       if (matched) setSelectedDistrict(matched.code);
     }
 
-    if (selectedDistrict && selectedDistrict.match(/^\d+$/)) {
+    if (selectedDistrict && selectedDistrict.match(/^[0-9.]+$/)) {
+      setWilayahLoading(prev => ({ ...prev, vil: true }));
       fetch(`/api/wilayah/villages/${selectedDistrict}.json`)
         .then(res => res.json())
         .then(json => setVillages(json.data || []))
-        .catch(() => setVillages([]));
+        .catch(() => setVillages([]))
+        .finally(() => setWilayahLoading(prev => ({ ...prev, vil: false })));
     }
   }, [selectedDistrict, districts]);
 
-  // Resolve Village Code if it was stored as a Name
+  // Resolve Village Code
   useEffect(() => {
-    if (villages.length > 0 && selectedVillage && !selectedVillage.match(/^\d+$/)) {
-      const matched = villages.find(v => v.name.toUpperCase() === selectedVillage.toUpperCase());
+    if (villages.length > 0 && selectedVillage && !selectedVillage.match(/^[0-9.]+$/)) {
+      const matched = villages.find(v => matchRegionName(v.name, selectedVillage));
       if (matched) setSelectedVillage(matched.code);
     }
   }, [selectedVillage, villages]);
@@ -338,7 +355,7 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
                                             }}
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-xs"
                                         >
-                                            <option value="">Pilih Provinsi</option>
+                                            <option value="">{wilayahLoading.prov ? 'Memuat...' : 'Pilih Provinsi'}</option>
                                             {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                                         </select>
                                     </div>
@@ -352,10 +369,10 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
                                               setSelectedDistrict("");
                                               setSelectedVillage("");
                                             }}
-                                            disabled={!selectedProvince}
+                                            disabled={!selectedProvince || wilayahLoading.reg}
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-xs disabled:opacity-50"
                                         >
-                                            <option value="">Pilih Kabupaten</option>
+                                            <option value="">{wilayahLoading.reg ? 'Memuat...' : 'Pilih Kabupaten'}</option>
                                             {regencies.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
                                         </select>
                                     </div>
@@ -368,10 +385,10 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
                                               setSelectedDistrict(e.target.value);
                                               setSelectedVillage("");
                                             }}
-                                            disabled={!selectedRegency}
+                                            disabled={!selectedRegency || wilayahLoading.dist}
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-xs disabled:opacity-50"
                                         >
-                                            <option value="">Pilih Kecamatan</option>
+                                            <option value="">{wilayahLoading.dist ? 'Memuat...' : 'Pilih Kecamatan'}</option>
                                             {districts.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
                                         </select>
                                     </div>
@@ -381,10 +398,10 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
                                         <select 
                                             value={selectedVillage}
                                             onChange={(e) => setSelectedVillage(e.target.value)}
-                                            disabled={!selectedDistrict}
+                                            disabled={!selectedDistrict || wilayahLoading.vil}
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-xs disabled:opacity-50"
                                         >
-                                            <option value="">Pilih Desa</option>
+                                            <option value="">{wilayahLoading.vil ? 'Memuat...' : 'Pilih Desa'}</option>
                                             {villages.map(v => <option key={v.code} value={v.code}>{v.name}</option>)}
                                         </select>
                                     </div>

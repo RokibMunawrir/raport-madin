@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, 
   Search, 
@@ -131,9 +131,9 @@ interface StudentManagementProps {
 
 const StudentManagement: React.FC<StudentManagementProps> = ({ 
   initialData,
-  currentPage,
-  totalPages,
-  totalCount,
+  currentPage: initialCurrentPage,
+  totalPages: initialTotalPages,
+  totalCount: initialTotalCount,
   searchQuery: initialSearchQuery = '',
   statusFilter: initialStatusFilter = 'All',
   genderFilter: initialGenderFilter = 'All',
@@ -143,17 +143,97 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
 }) => {
 
   const [students, setStudents] = useState<Student[]>(initialData || []);
+  const [currentPage, setCurrentPage] = useState(initialCurrentPage);
+  const [totalPages, setTotalPages] = useState(initialTotalPages);
+  const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [genderFilter, setGenderFilter] = useState(initialGenderFilter);
   const [classFilter, setClassFilter] = useState(initialClassFilter);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Import State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{message?: string, error?: string} | null>(null);
+  const [importResult, setImportResult] = useState<{message?: string, error?: string, details?: {row: number, column: string, message: string}[]} | null>(null);
+
+  // Live Search Effect
+  useEffect(() => {
+    // If everything matches initial state AND we are on page 1, we can use initialData instantly
+    const isInitialState = searchQuery === '' && 
+                          statusFilter === 'All' && 
+                          genderFilter === 'All' && 
+                          classFilter === 'All' && 
+                          currentPage === 1;
+
+    if (isInitialState && initialData) {
+        setStudents(initialData);
+        setTotalPages(initialTotalPages);
+        setTotalCount(initialTotalCount);
+        // Update URL to clean state
+        const url = new URL(window.location.href);
+        ['search', 'status', 'gender', 'class', 'page'].forEach(k => url.searchParams.delete(k));
+        window.history.pushState({}, '', url.toString());
+        return;
+    }
+
+    // Skip first run if query is same as initial to avoid redundant fetch on mount
+    if (searchQuery === initialSearchQuery && 
+        statusFilter === initialStatusFilter && 
+        genderFilter === initialGenderFilter && 
+        classFilter === initialClassFilter && 
+        currentPage === initialCurrentPage) {
+        return;
+    }
+
+    const fetchStudents = async () => {
+      setIsSearching(true);
+      try {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('search', searchQuery);
+        if (statusFilter !== 'All') params.set('status', statusFilter);
+        if (genderFilter !== 'All') params.set('gender', genderFilter);
+        if (classFilter !== 'All') params.set('class', classFilter);
+        params.set('page', currentPage.toString());
+
+        const response = await fetch(`/api/students/search?${params.toString()}`);
+        const result = await response.json();
+        
+        if (response.ok) {
+          setStudents(result.data);
+          setTotalPages(result.pagination.totalPages);
+          setTotalCount(result.pagination.totalCount);
+          
+          // Update URL without reload
+          const url = new URL(window.location.href);
+          params.forEach((value, key) => url.searchParams.set(key, value));
+          
+          // Cleanup URL
+          if (statusFilter === 'All') url.searchParams.delete('status');
+          if (genderFilter === 'All') url.searchParams.delete('gender');
+          if (classFilter === 'All') url.searchParams.delete('class');
+          if (!searchQuery) url.searchParams.delete('search');
+          if (currentPage === 1) url.searchParams.delete('page');
+          
+          window.history.pushState({}, '', url.toString());
+        }
+      } catch (error) {
+        console.error("Error fetching students:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    // If search is cleared, fetch immediately. Otherwise debounce.
+    const delay = searchQuery === '' ? 0 : 500;
+    const timer = setTimeout(() => {
+      fetchStudents();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, statusFilter, genderFilter, classFilter, currentPage]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -164,38 +244,23 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
 
   const handleImport = async () => {
     if (!importFile) return;
-    
     setIsImporting(true);
     setImportResult(null);
-    
     try {
       const formData = new FormData();
       formData.append('file', importFile);
-      
-      const response = await fetch('/api/students/import', {
-        method: 'POST',
-        body: formData,
-      });
-      
+      const response = await fetch('/api/students/import', { method: 'POST', body: formData });
       const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Gagal melakukan import');
-      }
-      
+      if (!response.ok) throw new Error(JSON.stringify(data));
       setImportResult({ message: data.message });
-      // Reload page to show new data after a short delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      
+      setTimeout(() => window.location.reload(), 2000);
     } catch (err: any) {
-      setImportResult({ error: err.message });
-    } finally {
-      setIsImporting(false);
-    }
+      try {
+        const errorData = JSON.parse(err.message);
+        setImportResult({ error: errorData.error || 'Gagal melakukan import', details: errorData.details });
+      } catch { setImportResult({ error: err.message }); }
+    } finally { setIsImporting(false); }
   };
-
 
   const handleExport = () => {
     const params = new URLSearchParams();
@@ -203,7 +268,6 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
     if (statusFilter !== 'All') params.set('status', statusFilter);
     if (genderFilter !== 'All') params.set('gender', genderFilter);
     if (classFilter !== 'All') params.set('class', classFilter);
-    
     window.location.href = `/api/students/export?${params.toString()}`;
   };
 
@@ -215,22 +279,22 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
     return count;
   }, [statusFilter, genderFilter, classFilter]);
 
-  const clearFilters = () => {
-    updateFilters({ status: 'All', gender: 'All', class: 'All', search: '', page: '1' });
+  const updateFilters = (newParams: Record<string, string>) => {
+    if (newParams.search !== undefined) setSearchQuery(newParams.search);
+    if (newParams.status !== undefined) setStatusFilter(newParams.status);
+    if (newParams.gender !== undefined) setGenderFilter(newParams.gender);
+    if (newParams.class !== undefined) setClassFilter(newParams.class);
+    if (newParams.page !== undefined) setCurrentPage(parseInt(newParams.page));
+    // Reset page to 1 if filter changes but not page
+    if (newParams.page === undefined) setCurrentPage(1);
   };
 
-  const updateFilters = (newParams: Record<string, string>) => {
-    const url = new URL(window.location.href);
-    Object.entries(newParams).forEach(([key, value]) => {
-      if (value === 'All' || value === '') {
-        url.searchParams.delete(key);
-      } else {
-        url.searchParams.set(key, value);
-      }
-    });
-    // Reset to page 1 when filter changes
-    if (!newParams.page) url.searchParams.set('page', '1');
-    window.location.href = url.pathname + url.search;
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('All');
+    setGenderFilter('All');
+    setClassFilter('All');
+    setCurrentPage(1);
   };
 
   const stats = useMemo(() => {
@@ -268,7 +332,7 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
               {/* Search */}
               <div className="relative w-full max-w-md group">
                 <span className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-all duration-300">
-                  <Search size={18} />
+                  {isSearching ? <span className="w-4 h-4 border-2 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></span> : <Search size={18} />}
                 </span>
                 <input
                   type="text"
@@ -276,7 +340,6 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
                   placeholder="Cari Nama atau NIS..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && updateFilters({ search: searchQuery })}
                 />
               </div>
 
@@ -622,14 +685,33 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
                     ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20' 
                     : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20'
                 }`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${importResult.error ? 'bg-rose-100 dark:bg-rose-500/20' : 'bg-emerald-100 dark:bg-emerald-500/20'}`}>
-                      {importResult.error ? <X size={18} /> : <GraduationCap size={18} />}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${importResult.error ? 'bg-rose-100 dark:bg-rose-500/20' : 'bg-emerald-100 dark:bg-emerald-500/20'}`}>
+                        {importResult.error ? <X size={18} /> : <GraduationCap size={18} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-black">{importResult.error || importResult.message}</p>
+                        {importResult.message && <p className="text-[10px] opacity-70 mt-0.5 italic font-medium">Halaman akan dimuat ulang secara otomatis...</p>}
+                      </div>
                     </div>
-                    <div>
-                      {importResult.error || importResult.message}
-                      {importResult.message && <p className="text-[10px] opacity-70 mt-0.5 italic font-medium">Halaman akan dimuat ulang secara otomatis...</p>}
-                    </div>
+
+                    {importResult.details && importResult.details.length > 0 && (
+                      <div className="mt-2 space-y-2 max-h-[200px] overflow-y-auto pr-2 supreme-scrollbar">
+                        <p className="text-[10px] uppercase tracking-widest text-rose-400 font-black mb-2">Detail Kesalahan Kolom:</p>
+                        {importResult.details.map((detail, idx) => (
+                          <div key={idx} className="flex items-start gap-3 p-3 bg-white/50 dark:bg-slate-900/50 rounded-xl border border-rose-100/50 dark:border-rose-500/10 group hover:border-rose-300 transition-colors">
+                            <div className="flex-shrink-0 w-12 text-center py-1 bg-rose-100 dark:bg-rose-500/20 rounded-lg text-[10px] font-black text-rose-600">
+                              Baris {detail.row}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight leading-none mb-1">{detail.column}</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 font-bold">{detail.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

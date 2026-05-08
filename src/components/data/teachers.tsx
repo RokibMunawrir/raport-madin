@@ -16,7 +16,8 @@ import {
   Loader2,
   Upload,
   Download,
-  FileText
+  FileText,
+  CheckCircle2
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
@@ -146,7 +147,53 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{message?: string, error?: string, details?: {row: number, column: string, message: string}[]} | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const { success, error, info, warning } = useNotification();
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    
+    setIsImporting(true);
+    setImportResult(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      
+      const response = await fetch('/api/teachers/import', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(JSON.stringify(data));
+      }
+      
+      setImportResult({ message: data.message });
+      success(data.message || "Import berhasil!");
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+    } catch (err: any) {
+      try {
+        const errorData = JSON.parse(err.message);
+        setImportResult({ 
+          error: errorData.error || 'Gagal melakukan import',
+          details: errorData.details
+        });
+      } catch {
+        setImportResult({ error: err.message });
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -789,49 +836,91 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
                   accept=".xlsx"
                   className="hidden" 
                   id="excel-upload"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    try {
-                      setIsImportModalOpen(false);
-                      info("Sedang memproses file import...");
-                      
-                      const res = await fetch('/api/teachers/import', {
-                        method: 'POST',
-                        body: formData
-                      });
-
-                      const result = await res.json();
-                      if (res.ok) {
-                        success(result.message || "Import berhasil!");
-                        setTimeout(() => window.location.reload(), 1500);
-                      } else {
-                        throw new Error(result.error || "Gagal mengimpor data");
-                      }
-                    } catch (err: any) {
-                      error(err.message);
+                  disabled={isImporting}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      setImportFile(e.target.files[0]);
+                      setImportResult(null);
                     }
-                  }}
+                  }} 
                 />
                 <label 
                   htmlFor="excel-upload"
-                  className="flex flex-col items-center justify-center gap-5 p-12 rounded-[40px] border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5 cursor-pointer transition-all group"
+                  className={`flex flex-col items-center justify-center gap-5 p-12 rounded-[40px] border-2 border-dashed transition-all group cursor-pointer ${
+                    importFile 
+                      ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-500/5' 
+                      : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5'
+                  }`}
                 >
-                   <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-3xl flex items-center justify-center shadow-md group-hover:shadow-xl group-hover:scale-110 transition-all">
-                      <Upload size={36} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                   <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-md transition-all ${
+                     importFile ? 'bg-emerald-500 text-white shadow-emerald-500/20 rotate-6' : 'bg-white dark:bg-slate-800'
+                   }`}>
+                      {importFile ? <FileText size={36} /> : <Upload size={36} className="text-slate-400 group-hover:text-emerald-500" />}
                    </div>
                    <div className="text-center">
-                      <p className="text-base font-black text-slate-700 dark:text-slate-100 italic">Pilih file .xlsx</p>
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Atau Seret File Kesini</p>
-                   </div>
-                   <div className="mt-2 px-5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest border border-slate-200 dark:border-slate-700">
-                      Format .xlsx • Maks 5MB
+                      <p className="text-base font-black text-slate-700 dark:text-slate-100 italic">
+                        {importFile ? importFile.name : 'Pilih file .xlsx'}
+                      </p>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        {importFile ? 'File siap diimport' : 'Atau Seret File Kesini'}
+                      </p>
                    </div>
                 </label>
+              </div>
+
+              {/* Feedback Area */}
+              {(importResult?.error || importResult?.message) && (
+                <div className={`p-5 rounded-2xl text-sm font-bold border animate-in slide-in-from-top-2 duration-500 ${
+                  importResult.error 
+                    ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20' 
+                    : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20'
+                }`}>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${importResult.error ? 'bg-rose-100 dark:bg-rose-500/20' : 'bg-emerald-100 dark:bg-emerald-500/20'}`}>
+                        {importResult.error ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-black">{importResult.error || importResult.message}</p>
+                      </div>
+                    </div>
+
+                    {importResult.details && (
+                      <div className="mt-2 space-y-2 max-h-[150px] overflow-y-auto pr-2 supreme-scrollbar">
+                        {importResult.details.map((detail, idx) => (
+                          <div key={idx} className="flex items-start gap-3 p-2 bg-white/50 dark:bg-slate-900/50 rounded-lg border border-rose-100/50 dark:border-rose-500/10">
+                            <span className="text-[10px] font-black text-rose-600 bg-rose-100 dark:bg-rose-500/20 px-2 py-0.5 rounded">Baris {detail.row}</span>
+                            <div className="flex-1">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-tight">{detail.column}</p>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 font-bold">{detail.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4">
+                 <button 
+                   onClick={() => setIsImportModalOpen(false)}
+                   disabled={isImporting}
+                   className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+                 >
+                   Batal
+                 </button>
+                 <button 
+                   onClick={handleImport}
+                   disabled={!importFile || isImporting}
+                   className={`flex-[2] py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                     !importFile || isImporting 
+                       ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed' 
+                       : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-[0.98]'
+                   }`}
+                 >
+                   {isImporting ? 'Memproses...' : 'Mulai Import'}
+                 </button>
               </div>
             </div>
           </div>
