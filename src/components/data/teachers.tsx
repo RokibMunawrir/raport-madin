@@ -17,7 +17,8 @@ import {
   Upload,
   Download,
   FileText,
-  CheckCircle2
+  CheckCircle2,
+  ChevronDown
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
@@ -40,10 +41,10 @@ interface Teacher {
   phone: string;
   email: string;
   address: string;
-  province?: string;
-  regency?: string;
-  district?: string;
-  village?: string;
+  province: string | null;
+  regency: string | null;
+  district: string | null;
+  village: string | null;
   birthPlace: string;
   birthDate: string;
   status: TeacherStatus;
@@ -64,6 +65,10 @@ const initialTeachers: Teacher[] = [
     birthDate: '1985-01-01',
     status: 'Aktif', 
     joinedDate: '2010-01-01',
+    province: null,
+    regency: null,
+    district: null,
+    village: null,
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmad'
   },
   { 
@@ -76,7 +81,11 @@ const initialTeachers: Teacher[] = [
     birthPlace: 'Solo',
     birthDate: '1990-05-12',
     status: 'Aktif', 
-    joinedDate: '2015-02-12'
+    joinedDate: '2015-02-12',
+    province: null,
+    regency: null,
+    district: null,
+    village: null
   },
   { 
     id: '3', 
@@ -89,6 +98,10 @@ const initialTeachers: Teacher[] = [
     birthDate: '1982-11-23',
     status: 'Cuti', 
     joinedDate: '2008-01-23',
+    province: null,
+    regency: null,
+    district: null,
+    village: null,
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Harun'
   },
   { 
@@ -101,7 +114,11 @@ const initialTeachers: Teacher[] = [
     birthPlace: 'Malang',
     birthDate: '1992-03-15',
     status: 'Aktif', 
-    joinedDate: '2018-02-15'
+    joinedDate: '2018-02-15',
+    province: null,
+    regency: null,
+    district: null,
+    village: null
   },
 ];
 
@@ -232,6 +249,31 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const [selectedVillage, setSelectedVillage] = useState('');
   const [wilayahLoading, setWilayahLoading] = useState({ prov: false, reg: false, dist: false, vil: false });
 
+  // Helper for flexible name matching (consistent with EditStudent.tsx)
+  const matchRegionName = (listName: string, selectedName: string) => {
+    if (!listName || !selectedName) return false;
+    const clean = (s: string) => s.toUpperCase()
+      .replace(/PROVINSI|KABUPATEN|KOTA|KECAMATAN|DESA|KELURAHAN|KAB\.|KOT\.|KEC\./g, '')
+      .replace(/\s+/g, '')
+      .trim();
+    return clean(listName) === clean(selectedName);
+  };
+
+  // Sync states when editing
+  useEffect(() => {
+    if (editingTeacher) {
+      setSelectedProvince(editingTeacher.province || '');
+      setSelectedRegency(editingTeacher.regency || '');
+      setSelectedDistrict(editingTeacher.district || '');
+      setSelectedVillage(editingTeacher.village || '');
+    } else {
+      setSelectedProvince('');
+      setSelectedRegency('');
+      setSelectedDistrict('');
+      setSelectedVillage('');
+    }
+  }, [editingTeacher]);
+
   // Fetch provinces on mount
   useEffect(() => {
     setWilayahLoading(prev => ({ ...prev, prov: true }));
@@ -244,15 +286,20 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
   // Fetch regencies when province changes
   useEffect(() => {
-    // Resolve Province Code if it was stored as a Name
-    if (provinces.length > 0 && selectedProvince && !selectedProvince.match(/^\d+$/)) {
-      const matched = provinces.find(p => p.name.toUpperCase() === selectedProvince.toUpperCase());
-      if (matched) setSelectedProvince(matched.code);
+    // 1. Resolve Province Code if it was stored as a Name
+    if (provinces.length > 0 && selectedProvince && !selectedProvince.match(/^[0-9.]+$/)) {
+      const matched = provinces.find(p => matchRegionName(p.name, selectedProvince));
+      if (matched) {
+        setSelectedProvince(matched.code);
+        return; // Wait for next run with code
+      }
     }
 
-    setRegencies([]); setDistricts([]); setVillages([]);
-    setSelectedRegency(''); setSelectedDistrict(''); setSelectedVillage('');
-    if (!selectedProvince || !selectedProvince.match(/^\d+$/)) return;
+    if (!selectedProvince || !selectedProvince.match(/^[0-9.]+$/)) {
+      setRegencies([]);
+      return;
+    }
+
     setWilayahLoading(prev => ({ ...prev, reg: true }));
     fetch(`/api/wilayah/regencies/${selectedProvince}.json`)
       .then(res => res.json())
@@ -263,15 +310,20 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
   // Fetch districts when regency changes
   useEffect(() => {
-    // Resolve Regency Code if it was stored as a Name
-    if (regencies.length > 0 && selectedRegency && !selectedRegency.match(/^\d+$/)) {
-      const matched = regencies.find(r => r.name.toUpperCase() === selectedRegency.toUpperCase());
-      if (matched) setSelectedRegency(matched.code);
+    // 1. Resolve Regency Code if it was stored as a Name
+    if (regencies.length > 0 && selectedRegency && !selectedRegency.match(/^[0-9.]+$/)) {
+      const matched = regencies.find(r => matchRegionName(r.name, selectedRegency));
+      if (matched) {
+        setSelectedRegency(matched.code);
+        return;
+      }
     }
 
-    setDistricts([]); setVillages([]);
-    setSelectedDistrict(''); setSelectedVillage('');
-    if (!selectedRegency || !selectedRegency.match(/^\d+$/)) return;
+    if (!selectedRegency || !selectedRegency.match(/^[0-9.]+$/)) {
+      setDistricts([]);
+      return;
+    }
+
     setWilayahLoading(prev => ({ ...prev, dist: true }));
     fetch(`/api/wilayah/districts/${selectedRegency}.json`)
       .then(res => res.json())
@@ -282,15 +334,20 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
   // Fetch villages when district changes
   useEffect(() => {
-    // Resolve District Code if it was stored as a Name
-    if (districts.length > 0 && selectedDistrict && !selectedDistrict.match(/^\d+$/)) {
-      const matched = districts.find(d => d.name.toUpperCase() === selectedDistrict.toUpperCase());
-      if (matched) setSelectedDistrict(matched.code);
+    // 1. Resolve District Code if it was stored as a Name
+    if (districts.length > 0 && selectedDistrict && !selectedDistrict.match(/^[0-9.]+$/)) {
+      const matched = districts.find(d => matchRegionName(d.name, selectedDistrict));
+      if (matched) {
+        setSelectedDistrict(matched.code);
+        return;
+      }
     }
 
-    setVillages([]);
-    setSelectedVillage('');
-    if (!selectedDistrict || !selectedDistrict.match(/^\d+$/)) return;
+    if (!selectedDistrict || !selectedDistrict.match(/^[0-9.]+$/)) {
+      setVillages([]);
+      return;
+    }
+
     setWilayahLoading(prev => ({ ...prev, vil: true }));
     fetch(`/api/wilayah/villages/${selectedDistrict}.json`)
       .then(res => res.json())
@@ -301,8 +358,8 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
   // Resolve Village Code if it was stored as a Name
   useEffect(() => {
-    if (villages.length > 0 && selectedVillage && !selectedVillage.match(/^\d+$/)) {
-      const matched = villages.find(v => v.name.toUpperCase() === selectedVillage.toUpperCase());
+    if (villages.length > 0 && selectedVillage && !selectedVillage.match(/^[0-9.]+$/)) {
+      const matched = villages.find(v => matchRegionName(v.name, selectedVillage));
       if (matched) setSelectedVillage(matched.code);
     }
   }, [selectedVillage, villages]);
@@ -329,6 +386,7 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
       if (toastStatus === 'added') success("Berhasil mendaftarkan Asatidz baru!", 5000);
       else if (toastStatus === 'updated') info("Profil Asatidz berhasil diperbarui.", 5000);
       else if (toastStatus === 'deleted') warning("Data Asatidz telah dihapus dari sistem.", 5000);
+      else if (toastStatus === 'error') error(urlParams.get('message') || "Gagal menyimpan data.", 5000);
 
       // Clean the url so refresh doesn't trigger again
       const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
@@ -549,10 +607,19 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 <button 
                   type="submit" 
                   form="teacher-form" 
-                  className="px-12 py-4 bg-indigo-600 text-white rounded-[22px] text-sm font-black hover:bg-indigo-700 shadow-2xl shadow-indigo-600/30 transition-all transform active:scale-95 flex items-center gap-3"
+                  disabled={!!(wilayahLoading.prov || wilayahLoading.reg || wilayahLoading.dist || wilayahLoading.vil)}
+                  className={`px-12 py-4 bg-indigo-600 text-white rounded-[22px] text-sm font-black hover:bg-indigo-700 shadow-2xl shadow-indigo-600/30 transition-all transform active:scale-95 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  <UserCheck size={20} />
-                  <span>{editingTeacher ? "Simpan Perubahan" : "Resmikan Pengajar"}</span>
+                  {(wilayahLoading.prov || wilayahLoading.reg || wilayahLoading.dist || wilayahLoading.vil) ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <UserCheck size={20} />
+                  )}
+                  <span>
+                    {(wilayahLoading.prov || wilayahLoading.reg || wilayahLoading.dist || wilayahLoading.vil) 
+                      ? "Memproses Wilayah..." 
+                      : (editingTeacher ? "Simpan Perubahan" : "Resmikan Pengajar")}
+                  </span>
                 </button>
              </>
           }
@@ -714,76 +781,96 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
                           />
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px]">Provinsi</label>
-                          <div className="relative">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Provinsi</label>
+                          <div className="relative group">
                             <input type="hidden" name="province" value={provinces.find(p => p.code === selectedProvince)?.name || selectedProvince} />
                             <select 
                               value={selectedProvince}
-                              onChange={(e) => setSelectedProvince(e.target.value)}
-                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300"
+                              onChange={(e) => {
+                                setSelectedProvince(e.target.value);
+                                setSelectedRegency('');
+                                setSelectedDistrict('');
+                                setSelectedVillage('');
+                              }}
+                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 transition-all"
                             >
-                              <option value="">— Pilih —</option>
+                              <option value="">— Pilih Provinsi —</option>
                               {provinces.map(p => (
                                 <option key={p.code} value={p.code}>{p.name}</option>
                               ))}
                             </select>
-                            {wilayahLoading.prov && <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-indigo-500" />}
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-500 transition-colors">
+                              {wilayahLoading.prov ? <Loader2 size={16} className="animate-spin text-indigo-500" /> : <ChevronDown size={16} />}
+                            </div>
                           </div>
                       </div>
                       <div className="space-y-3">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px]">Kota/Kabupaten</label>
-                          <div className="relative">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Kota/Kabupaten</label>
+                          <div className="relative group">
                             <input type="hidden" name="regency" value={regencies.find(r => r.code === selectedRegency)?.name || selectedRegency} />
                             <select 
                               value={selectedRegency}
-                              onChange={(e) => setSelectedRegency(e.target.value)}
-                              disabled={!selectedProvince}
-                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 disabled:opacity-50"
+                              onChange={(e) => {
+                                setSelectedRegency(e.target.value);
+                                setSelectedDistrict('');
+                                setSelectedVillage('');
+                              }}
+                              disabled={!selectedProvince || !selectedProvince.match(/^[0-9.]+$/)}
+                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 disabled:opacity-50 transition-all"
                             >
-                              <option value="">— Pilih —</option>
+                              <option value="">— Pilih Kota/Kab —</option>
                               {regencies.map(r => (
                                 <option key={r.code} value={r.code}>{r.name}</option>
                               ))}
                             </select>
-                            {wilayahLoading.reg && <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-indigo-500" />}
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-500 transition-colors">
+                              {wilayahLoading.reg ? <Loader2 size={16} className="animate-spin text-indigo-500" /> : <ChevronDown size={16} />}
+                            </div>
                           </div>
                       </div>
                       <div className="space-y-3">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px]">Kecamatan</label>
-                          <div className="relative">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Kecamatan</label>
+                          <div className="relative group">
                             <input type="hidden" name="district" value={districts.find(d => d.code === selectedDistrict)?.name || selectedDistrict} />
                             <select 
                               value={selectedDistrict}
-                              onChange={(e) => setSelectedDistrict(e.target.value)}
-                              disabled={!selectedRegency}
-                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 disabled:opacity-50"
+                              onChange={(e) => {
+                                setSelectedDistrict(e.target.value);
+                                setSelectedVillage('');
+                              }}
+                              disabled={!selectedRegency || !selectedRegency.match(/^[0-9.]+$/)}
+                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 disabled:opacity-50 transition-all"
                             >
-                              <option value="">— Pilih —</option>
+                              <option value="">— Pilih Kecamatan —</option>
                               {districts.map(d => (
                                 <option key={d.code} value={d.code}>{d.name}</option>
                               ))}
                             </select>
-                            {wilayahLoading.dist && <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-indigo-500" />}
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-500 transition-colors">
+                              {wilayahLoading.dist ? <Loader2 size={16} className="animate-spin text-indigo-500" /> : <ChevronDown size={16} />}
+                            </div>
                           </div>
                       </div>
                       <div className="space-y-3">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px]">Desa/Kelurahan</label>
-                          <div className="relative">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Desa/Kelurahan</label>
+                          <div className="relative group">
                             <input type="hidden" name="village" value={villages.find(v => v.code === selectedVillage)?.name || selectedVillage} />
                             <select 
                               value={selectedVillage}
                               onChange={(e) => setSelectedVillage(e.target.value)}
-                              disabled={!selectedDistrict}
-                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 disabled:opacity-50"
+                              disabled={!selectedDistrict || !selectedDistrict.match(/^[0-9.]+$/)}
+                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none text-xs font-bold dark:text-slate-300 disabled:opacity-50 transition-all"
                             >
-                              <option value="">— Pilih —</option>
+                              <option value="">— Pilih Desa —</option>
                               {villages.map(v => (
                                 <option key={v.code} value={v.code}>{v.name}</option>
                               ))}
                             </select>
-                            {wilayahLoading.vil && <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-indigo-500" />}
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-500 transition-colors">
+                              {wilayahLoading.vil ? <Loader2 size={16} className="animate-spin text-indigo-500" /> : <ChevronDown size={16} />}
+                            </div>
                           </div>
                       </div>
                     </div>

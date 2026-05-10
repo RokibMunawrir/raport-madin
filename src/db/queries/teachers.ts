@@ -8,19 +8,19 @@ export async function getTeachers() {
 
 export async function addTeacher(data: { 
   name: string; 
-  nip?: string; 
-  phone?: string; 
-  email?: string; 
-  address?: string; 
-  birthPlace?: string; 
-  birthDate?: string; 
-  status?: string;
-  gender?: string;
-  joinedDate?: string;
-  province?: string;
-  regency?: string;
-  district?: string;
-  village?: string;
+  nip?: string | null; 
+  phone?: string | null; 
+  email?: string | null; 
+  address?: string | null; 
+  birthPlace?: string | null; 
+  birthDate?: string | null; 
+  status?: string | null;
+  gender?: string | null;
+  joinedDate?: string | null;
+  province?: string | null;
+  regency?: string | null;
+  district?: string | null;
+  village?: string | null;
 }) {
   const result = await db.insert(teachers).values({
     ...data,
@@ -39,19 +39,19 @@ export async function addTeacher(data: {
 
 export async function updateTeacher(id: string, data: { 
   name: string; 
-  nip?: string; 
-  phone?: string; 
-  email?: string; 
-  address?: string; 
-  birthPlace?: string; 
-  birthDate?: string; 
-  status?: string;
-  gender?: string;
-  joinedDate?: string;
-  province?: string;
-  regency?: string;
-  district?: string;
-  village?: string;
+  nip?: string | null; 
+  phone?: string | null; 
+  email?: string | null; 
+  address?: string | null; 
+  birthPlace?: string | null; 
+  birthDate?: string | null; 
+  status?: string | null;
+  gender?: string | null;
+  joinedDate?: string | null;
+  province?: string | null;
+  regency?: string | null;
+  district?: string | null;
+  village?: string | null;
 }) {
   await db.update(teachers)
     .set({

@@ -5,23 +5,14 @@ import {
   Filter, 
   Plus, 
   Edit2, 
-  Trash2, 
   UserCheck, 
   GraduationCap, 
   X, 
   ChevronRight,
-  MoreHorizontal,
-  LayoutGrid,
   School,
-  ArrowRight,
   UserPlus,
-  MoreVertical,
   CheckCircle2,
-  AlertCircle,
-  Upload,
-  Download,
-  FileSpreadsheet
-} from 'lucide-react';
+  AlertCircle} from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
 import { useNotification } from '../ui/notification';
@@ -32,7 +23,7 @@ interface SchoolClass {
   id: string;
   name: string;
   level: string | null;
-  room: string;
+  room: string | null;
   teacherId: string | null;
   teacherName: string | null;
   teacherNip: string | null;
@@ -208,7 +199,7 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
                 </div>
                 <div className="hidden sm:flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 px-4 py-2 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
                     <CheckCircle2 size={16} className="text-indigo-600 dark:text-indigo-400" />
-                    <span className="text-xs font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-tighter">Sistem Penempatan Aktif</span>
+                    <span className="text-xs font-black text-indigo-900 dark:text-indigo-300 tracking-tighter">Sistem Penempatan Aktif</span>
                 </div>
             </div>
             
@@ -391,7 +382,7 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
                             <div className="w-full pt-6 mt-6 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-4">
                                 <div className="text-left">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ruangan</p>
-                                    <p className="text-xs font-black text-slate-700 dark:text-slate-200">{selectedClass.room}</p>
+                                    <p className="text-xs font-black text-slate-700 dark:text-slate-200">{selectedClass.room || '-'}</p>
                                 </div>
                                 <div className="text-left">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Maks Konten</p>
@@ -453,9 +444,6 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
                                                         <X size={18} />
                                                     </button>
                                                 </form>
-                                                <button type="button" className="p-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all">
-                                                    <MoreVertical size={18} />
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -486,17 +474,32 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
           description={`Daftar santri yang belum memiliki kelas di Tahun Ajaran ${activeYear?.name || '-'}.`}
         >
           <div className="space-y-6">
-            <div className="relative group max-w-md mx-auto">
-              <span className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors">
-                <Search size={18} />
-              </span>
-              <input
-                type="text"
-                placeholder="Cari santri..."
-                className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all text-sm font-bold dark:text-slate-200"
-                value={searchUnassigned}
-                onChange={(e) => setSearchUnassigned(e.target.value)}
-              />
+            <div className="flex flex-col sm:flex-row items-center gap-4 max-w-2xl mx-auto">
+              <div className="relative group flex-1 w-full">
+                <span className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                  <Search size={18} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Cari santri..."
+                  className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all text-sm font-bold dark:text-slate-200"
+                  value={searchUnassigned}
+                  onChange={(e) => setSearchUnassigned(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedStudentIds.length === filteredUnassigned.length) {
+                    setSelectedStudentIds([]);
+                  } else {
+                    setSelectedStudentIds(filteredUnassigned.map(s => s.id));
+                  }
+                }}
+                className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-indigo-300 transition-all active:scale-95 whitespace-nowrap"
+              >
+                {selectedStudentIds.length === filteredUnassigned.length && filteredUnassigned.length > 0 ? "Batal Semua" : "Pilih Semua"}
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto px-2 custom-scrollbar">

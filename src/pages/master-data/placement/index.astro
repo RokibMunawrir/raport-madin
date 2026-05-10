@@ -67,20 +67,27 @@ if (Astro.request.method === "POST") {
 
             const studentIds = studentIdsStr.split(',').filter(id => id.trim() !== "");
             
-            for (const studentId of studentIds) {
-                // Check if already assigned for this year
-                const existing = await db.select().from(studentClassrooms)
-                    .where(and(
-                        eq(studentClassrooms.studentId, studentId),
-                        eq(studentClassrooms.academicYearId, activeYear.id)
-                    ));
-                
-                if (existing.length === 0) {
-                    await addStudentPlacement({
-                        studentId,
-                        classroomId,
-                        academicYearId: activeYear.id
-                    });
+            // Get all existing placements for these students in the active year
+            const existingPlacements = await db.select({ studentId: studentClassrooms.studentId })
+                .from(studentClassrooms)
+                .where(and(
+                    sql`${studentClassrooms.studentId} IN (${studentIds.map(id => `'${id}'`).join(',')})`,
+                    eq(studentClassrooms.academicYearId, activeYear.id)
+                ));
+            
+            const existingIds = new Set(existingPlacements.map(p => p.studentId));
+            const newPlacements = studentIds
+                .filter(id => !existingIds.has(id))
+                .map(studentId => ({
+                    studentId,
+                    classroomId,
+                    academicYearId: activeYear.id
+                }));
+
+            if (newPlacements.length > 0) {
+                // Batch insert
+                for (const p of newPlacements) {
+                    await addStudentPlacement(p);
                 }
             }
             successStatus = "assigned";
@@ -121,7 +128,7 @@ const allClassrooms = await db
         id: classrooms.id,
         name: classrooms.name,
         level: classrooms.level,
-        room: sql<string>`'Gedung - ' || ${classrooms.name}`, // Placeholder for room
+        room: classrooms.room,
         capacity: classrooms.capacity,
         teacherId: classrooms.teacherId,
         teacherName: teachers.name,
@@ -171,7 +178,7 @@ const unassignedStudentsResult = await db
               ))
         )
     )
-    .limit(50); // Limit to 50 for performance
+    .orderBy(students.name);
 
 // 7. Fetch All Teachers (for Wali Kelas Dropdown)
 const allTeachers = await db.select().from(teachers).orderBy(teachers.name);

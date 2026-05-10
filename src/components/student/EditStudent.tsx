@@ -125,51 +125,69 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
   useEffect(() => {
     if (provinces.length > 0 && selectedProvince && !selectedProvince.match(/^[0-9.]+$/)) {
       const matched = provinces.find(p => matchRegionName(p.name, selectedProvince));
-      if (matched) setSelectedProvince(matched.code);
+      if (matched) {
+        setSelectedProvince(matched.code);
+        return;
+      }
     }
 
-    if (selectedProvince && selectedProvince.match(/^[0-9.]+$/)) {
-      setWilayahLoading(prev => ({ ...prev, reg: true }));
-      fetch(`/api/wilayah/regencies/${selectedProvince}.json`)
-        .then(res => res.json())
-        .then(json => setRegencies(json.data || []))
-        .catch(() => setRegencies([]))
-        .finally(() => setWilayahLoading(prev => ({ ...prev, reg: false })));
+    if (!selectedProvince || !selectedProvince.match(/^[0-9.]+$/)) {
+      setRegencies([]);
+      return;
     }
+
+    setWilayahLoading(prev => ({ ...prev, reg: true }));
+    fetch(`/api/wilayah/regencies/${selectedProvince}.json`)
+      .then(res => res.json())
+      .then(json => setRegencies(json.data || []))
+      .catch(() => setRegencies([]))
+      .finally(() => setWilayahLoading(prev => ({ ...prev, reg: false })));
   }, [selectedProvince, provinces]);
 
   // Fetch & Resolve Districts
   useEffect(() => {
     if (regencies.length > 0 && selectedRegency && !selectedRegency.match(/^[0-9.]+$/)) {
       const matched = regencies.find(r => matchRegionName(r.name, selectedRegency));
-      if (matched) setSelectedRegency(matched.code);
+      if (matched) {
+        setSelectedRegency(matched.code);
+        return;
+      }
     }
 
-    if (selectedRegency && selectedRegency.match(/^[0-9.]+$/)) {
-      setWilayahLoading(prev => ({ ...prev, dist: true }));
-      fetch(`/api/wilayah/districts/${selectedRegency}.json`)
-        .then(res => res.json())
-        .then(json => setDistricts(json.data || []))
-        .catch(() => setDistricts([]))
-        .finally(() => setWilayahLoading(prev => ({ ...prev, dist: false })));
+    if (!selectedRegency || !selectedRegency.match(/^[0-9.]+$/)) {
+      setDistricts([]);
+      return;
     }
+
+    setWilayahLoading(prev => ({ ...prev, dist: true }));
+    fetch(`/api/wilayah/districts/${selectedRegency}.json`)
+      .then(res => res.json())
+      .then(json => setDistricts(json.data || []))
+      .catch(() => setDistricts([]))
+      .finally(() => setWilayahLoading(prev => ({ ...prev, dist: false })));
   }, [selectedRegency, regencies]);
 
   // Fetch & Resolve Villages
   useEffect(() => {
     if (districts.length > 0 && selectedDistrict && !selectedDistrict.match(/^[0-9.]+$/)) {
       const matched = districts.find(d => matchRegionName(d.name, selectedDistrict));
-      if (matched) setSelectedDistrict(matched.code);
+      if (matched) {
+        setSelectedDistrict(matched.code);
+        return;
+      }
     }
 
-    if (selectedDistrict && selectedDistrict.match(/^[0-9.]+$/)) {
-      setWilayahLoading(prev => ({ ...prev, vil: true }));
-      fetch(`/api/wilayah/villages/${selectedDistrict}.json`)
-        .then(res => res.json())
-        .then(json => setVillages(json.data || []))
-        .catch(() => setVillages([]))
-        .finally(() => setWilayahLoading(prev => ({ ...prev, vil: false })));
+    if (!selectedDistrict || !selectedDistrict.match(/^[0-9.]+$/)) {
+      setVillages([]);
+      return;
     }
+
+    setWilayahLoading(prev => ({ ...prev, vil: true }));
+    fetch(`/api/wilayah/villages/${selectedDistrict}.json`)
+      .then(res => res.json())
+      .then(json => setVillages(json.data || []))
+      .catch(() => setVillages([]))
+      .finally(() => setWilayahLoading(prev => ({ ...prev, vil: false })));
   }, [selectedDistrict, districts]);
 
   // Resolve Village Code
@@ -430,11 +448,22 @@ const EditStudent: React.FC<EditStudentProps> = ({ student, dormitories, classro
                     <button type="button" onClick={() => window.history.back()} className="flex-1 sm:flex-none px-8 py-3.5 text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Batal</button>
                     <button 
                         type="submit"
-                        disabled={loading}
+                        disabled={!!(
+                          loading || 
+                          wilayahLoading.prov || wilayahLoading.reg || wilayahLoading.dist || wilayahLoading.vil ||
+                          (selectedProvince && !selectedProvince.match(/^[0-9.]+$/)) ||
+                          (selectedRegency && !selectedRegency.match(/^[0-9.]+$/)) ||
+                          (selectedDistrict && !selectedDistrict.match(/^[0-9.]+$/)) ||
+                          (selectedVillage && !selectedVillage.match(/^[0-9.]+$/))
+                        )}
                         className="flex-1 sm:flex-none px-12 py-3.5 bg-indigo-600 text-white rounded-[20px] text-sm font-black hover:bg-indigo-700 shadow-xl shadow-indigo-600/30 transition-all transform active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                    {loading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                    <span>Simpan Perubahan</span>
+                    {loading || wilayahLoading.reg || wilayahLoading.dist || wilayahLoading.vil ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                    <span>
+                      {wilayahLoading.reg || wilayahLoading.dist || wilayahLoading.vil 
+                        ? "Sinkronisasi..." 
+                        : "Simpan Perubahan"}
+                    </span>
                     </button>
                 </div>
             </div>

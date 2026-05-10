@@ -420,7 +420,7 @@ const ScoreManagement: React.FC<ScoreManagementProps> = ({
                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"></div>Grade C (70-79)</div>
                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-rose-500"></div>Grade D (&lt;70)</div>
               </div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-tighter">
+              <p className="text-xs font-medium text-slate-400 tracking-tighter">
                 Klik <span className="font-bold text-indigo-600">Simpan Nilai</span> untuk menyimpan permanen ke database.
               </p>
           </div>

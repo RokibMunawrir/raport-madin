@@ -40,21 +40,24 @@ if (Astro.request.method === "POST") {
     const action = formData.get("_action") as string;
     const id = formData.get("id") as string;
     
+    const rawPhone = formData.get("phone") as string;
+    const phone = rawPhone ? (rawPhone.startsWith('0') ? '+62' + rawPhone.slice(1) : (rawPhone.startsWith('62') ? '+' + rawPhone : (rawPhone.startsWith('+') ? rawPhone : '+62' + rawPhone))) : "";
+
     const teacherData = {
-      name: formData.get("name") as string,
-      nip: formData.get("nip") as string,
-      gender: formData.get("gender") as string,
-      phone: formData.get("phone") as string,
-      email: formData.get("email") as string,
-      address: formData.get("address") as string,
-      province: formData.get("province") as string,
-      regency: formData.get("regency") as string,
-      district: formData.get("district") as string,
-      village: formData.get("village") as string,
-      birthPlace: formData.get("birthPlace") as string,
-      birthDate: formData.get("birthDate") as string,
-      status: formData.get("status") as string,
-      joinedDate: formData.get("joinedDate") as string,
+      name: formData.get("name")?.toString() || "",
+      nip: formData.get("nip")?.toString() || null,
+      gender: formData.get("gender")?.toString() || "Laki-laki",
+      phone: phone,
+      email: formData.get("email")?.toString() || null,
+      address: formData.get("address")?.toString() || null,
+      province: formData.get("province")?.toString() || null,
+      regency: formData.get("regency")?.toString() || null,
+      district: formData.get("district")?.toString() || null,
+      village: formData.get("village")?.toString() || null,
+      birthPlace: formData.get("birthPlace")?.toString() || null,
+      birthDate: (formData.get("birthDate")?.toString()) || null,
+      status: formData.get("status")?.toString() || "Aktif",
+      joinedDate: (formData.get("joinedDate")?.toString()) || null,
     };
 
     let successStatus = "";
@@ -73,8 +76,9 @@ if (Astro.request.method === "POST") {
     if (successStatus) {
       return Astro.redirect(`/master-data/teachers?toast=${successStatus}`);
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error processing teacher action:", e);
+    return Astro.redirect(`/master-data/teachers?toast=error&message=${encodeURIComponent(e.message || "Terjadi kesalahan sistem")}`);
   }
 }
 
@@ -109,10 +113,10 @@ const initialData = teachersData.map(t => ({
   birthDate: t.birthDate || '-',
   status: t.status as any || 'Aktif',
   joinedDate: t.joinedDate || '-',
-  province: t.province ?? undefined,
-  regency: t.regency ?? undefined,
-  district: t.district ?? undefined,
-  village: t.village ?? undefined,
+  province: t.province ?? null,
+  regency: t.regency ?? null,
+  district: t.district ?? null,
+  village: t.village ?? null,
   avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${t.name}`
 }));
 ---
