@@ -4,7 +4,7 @@ import MemorizeManagement from "../../../components/data/memorize";
 import { addMemorizeTarget, updateMemorizeTarget, deleteMemorizeTarget } from "../../../db/queries/masterData";
 import { db } from "../../../db";
 import { memorizeTargets } from "../../../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
 const sessionUser = user as any;
@@ -52,8 +52,15 @@ if (Astro.request.method === "POST") {
     }
 }
 
-// 2. Fetch All Targets
-const allTargets = await db.select().from(memorizeTargets).orderBy(desc(memorizeTargets.createdAt));
+// 2. Fetch Query Parameters
+const url = new URL(Astro.url);
+const sortBy = url.searchParams.get("sortBy") || "title";
+const sortOrder = url.searchParams.get("sortOrder") || "asc";
+
+// 3. Fetch All Targets
+const orderColumn = sortBy === 'category' ? memorizeTargets.category : memorizeTargets.title;
+
+const allTargets = await db.select().from(memorizeTargets).orderBy(sortOrder === 'asc' ? asc(orderColumn) : desc(orderColumn));
 
 ---
 
@@ -61,7 +68,8 @@ const allTargets = await db.select().from(memorizeTargets).orderBy(desc(memorize
   <MemorizeManagement 
     client:only="react" 
     initialTargets={allTargets} 
+    sortBy={sortBy}
+    sortOrder={sortOrder}
     user={sessionUser}
   />
 </Layout>
-

@@ -4,7 +4,7 @@ import DormitoryManagement from "../../../components/data/dormitory";
 import { addDormitory, updateDormitory, deleteDormitory } from "../../../db/queries/masterData";
 import { db } from "../../../db";
 import { dormitories, students } from "../../../db/schema";
-import { eq, count, sql, and, desc, like } from "drizzle-orm";
+import { eq, count, sql, and, desc, asc, like } from "drizzle-orm";
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
 const sessionUser = user as any;
@@ -56,6 +56,8 @@ const offset = (page - 1) * limit;
 const search = url.searchParams.get("search") || "";
 const blockFilter = url.searchParams.get("block") || "All";
 const categoryFilter = url.searchParams.get("category") || "All";
+const sortBy = url.searchParams.get("sortBy") || "name";
+const sortOrder = url.searchParams.get("sortOrder") || "asc";
 
 // 3. Build Filters
 const filters = [];
@@ -81,6 +83,8 @@ const totalCount = totalCountResult[0]?.total || 0;
 const totalPages = Math.ceil(totalCount / limit);
 
 // 5. Fetch Paginated Data (Dormitories + Occupancy Count)
+const orderColumn = sortBy === 'block' ? dormitories.block : dormitories.name;
+
 const dormResults = await db
     .select({
         id: dormitories.id,
@@ -98,7 +102,7 @@ const dormResults = await db
     .limit(limit)
     .offset(offset)
     .groupBy(dormitories.id)
-    .orderBy(desc(dormitories.createdAt));
+    .orderBy(sortOrder === 'asc' ? asc(orderColumn) : desc(orderColumn));
 
 const initialData = dormResults.map(d => ({
     id: d.id,
@@ -123,6 +127,8 @@ const initialData = dormResults.map(d => ({
         searchQuery={search}
         blockFilter={blockFilter}
         categoryFilter={categoryFilter}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
         user={sessionUser}
     />
 

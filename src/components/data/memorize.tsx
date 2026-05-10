@@ -13,7 +13,8 @@ import {
   LayoutGrid,
   FileText,
   Target,
-  Award
+  Award,
+  ArrowUpDown
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
@@ -36,6 +37,8 @@ interface MemorizeTarget {
 
 interface MemorizeManagementProps {
   initialTargets: MemorizeTarget[];
+  sortBy?: string;
+  sortOrder?: string;
   user?: any;
 }
 
@@ -57,12 +60,29 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: React.Re
   </div>
 );
 
-const MemorizeManagement: React.FC<MemorizeManagementProps> = ({ initialTargets: data, user }) => {
+const MemorizeManagement: React.FC<MemorizeManagementProps> = ({ 
+  initialTargets: data, 
+  sortBy = 'title',
+  sortOrder = 'asc',
+  user 
+}) => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MemorizeTarget | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+
+  const updateFilters = (newParams: Record<string, string>) => {
+    const url = new URL(window.location.href);
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value === 'All' || value === '') {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, value);
+      }
+    });
+    window.location.href = url.pathname + url.search;
+  };
 
   const { success } = useNotification();
 
@@ -174,7 +194,15 @@ const MemorizeManagement: React.FC<MemorizeManagementProps> = ({ initialTargets:
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Judul Hafalan</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <button 
+                      onClick={() => updateFilters({ sortBy: 'title', sortOrder: sortBy === 'title' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                      className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
+                    >
+                      Judul Hafalan
+                      <ArrowUpDown size={12} className={sortBy === 'title' ? 'text-indigo-600' : 'opacity-30'} />
+                    </button>
+                  </th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Target Tingkat</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Reward Poin</th>

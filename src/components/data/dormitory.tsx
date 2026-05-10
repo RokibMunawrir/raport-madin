@@ -13,7 +13,8 @@ import {
   ArrowUpRight,
   LayoutGrid,
   MoreHorizontal,
-  AlertCircle
+  AlertCircle,
+  ArrowUpDown
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
@@ -38,6 +39,8 @@ interface DormitoryManagementProps {
   searchQuery?: string;
   blockFilter?: string;
   categoryFilter?: string;
+  sortBy?: string;
+  sortOrder?: string;
   user?: any;
 }
 
@@ -62,6 +65,8 @@ const DormitoryManagement: React.FC<DormitoryManagementProps> = ({
   searchQuery: initialSearchQuery = '',
   blockFilter: initialBlockFilter = 'All',
   categoryFilter: initialCategoryFilter = 'All',
+  sortBy = 'name',
+  sortOrder = 'asc',
   user
 }) => {
 
@@ -196,7 +201,15 @@ const DormitoryManagement: React.FC<DormitoryManagementProps> = ({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Informasi Asrama</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <button 
+                      onClick={() => updateFilters({ sortBy: 'name', sortOrder: sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                      className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
+                    >
+                      Informasi Asrama
+                      <ArrowUpDown size={12} className={sortBy === 'name' ? 'text-indigo-600' : 'opacity-30'} />
+                    </button>
+                  </th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Kode Kamar</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lokasi Blok</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe</th>

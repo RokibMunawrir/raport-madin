@@ -18,7 +18,8 @@ import {
   Download,
   FileText,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  ArrowUpDown
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
@@ -142,6 +143,8 @@ interface TeacherManagementProps {
   totalCount: number;
   searchQuery: string;
   statusFilter: string;
+  sortBy?: string;
+  sortOrder?: string;
   user?: any;
 }
 
@@ -153,6 +156,8 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
   totalCount,
   searchQuery: initialSearchQuery,
   statusFilter: initialStatusFilter,
+  sortBy = 'name',
+  sortOrder = 'asc',
   user
 }) => {
 
@@ -507,7 +512,24 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Informasi Asatidz</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => updateFilters({ sortBy: 'name', sortOrder: sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
+                      >
+                        Informasi Asatidz
+                        <ArrowUpDown size={12} className={sortBy === 'name' ? 'text-indigo-600' : 'opacity-30'} />
+                      </button>
+                      <button 
+                        onClick={() => updateFilters({ sortBy: 'nip', sortOrder: sortBy === 'nip' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
+                      >
+                        (NIP)
+                        <ArrowUpDown size={12} className={sortBy === 'nip' ? 'text-indigo-600' : 'opacity-30'} />
+                      </button>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kontak</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose w-64">Tempat, Tgl Lahir</th>
                   <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center w-28">Status</th>

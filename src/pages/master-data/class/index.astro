@@ -4,7 +4,7 @@ import ClassManagement, { type SchoolClass } from "../../../components/data/clas
 import { addClassroom, updateClassroom, deleteClassroom } from "../../../db/queries/masterData";
 import { db } from "../../../db";
 import { classrooms, teachers, studentClassrooms } from "../../../db/schema";
-import { count, eq, like, and, sql, desc } from "drizzle-orm";
+import { count, eq, like, and, sql, desc, asc } from "drizzle-orm";
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
 const sessionUser = user as any;
@@ -63,6 +63,8 @@ const offset = (page - 1) * limit;
 const search = url.searchParams.get("search") || "";
 const level = url.searchParams.get("level") || "All";
 const gender = url.searchParams.get("gender") || "All";
+const sortBy = url.searchParams.get("sortBy") || "name";
+const sortOrder = url.searchParams.get("sortOrder") || "asc";
 
 // 3. Build Filters
 const filters = [];
@@ -103,6 +105,8 @@ const putriCountResult = await db
 const putriCount = putriCountResult[0]?.total || 0;
 
 // 6. Fetch Paginated Classes with Teacher Names and Student Counts
+const orderColumn = sortBy === 'level' ? classrooms.level : classrooms.name;
+
 const classroomsData = await db
     .select({
         id: classrooms.id,
@@ -120,7 +124,7 @@ const classroomsData = await db
     .where(filterQuery)
     .limit(limit)
     .offset(offset)
-    .orderBy(desc(classrooms.createdAt));
+    .orderBy(sortOrder === 'asc' ? asc(orderColumn) : desc(orderColumn));
 
 // Mapping to ensure types match SchoolClass interface exactly
 const classes: SchoolClass[] = classroomsData.map(c => ({
@@ -156,6 +160,8 @@ const teachersList = await db
         searchQuery={search}
         levelFilter={level}
         genderFilter={gender}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
         user={sessionUser}
     />
 

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../db';
 import { students, classrooms, studentClassrooms, dormitories } from '../../../db/schema';
-import { count, eq, like, and, desc, or } from 'drizzle-orm';
+import { count, eq, like, and, desc, asc, or } from 'drizzle-orm';
 
 export const GET: APIRoute = async ({ url }) => {
   try {
@@ -10,6 +10,8 @@ export const GET: APIRoute = async ({ url }) => {
     const genderFilter = url.searchParams.get("gender") || "All";
     const classFilter = url.searchParams.get("class") || "All";
     const page = parseInt(url.searchParams.get("page") || "1");
+    const sortBy = url.searchParams.get("sortBy") || "name";
+    const sortOrder = url.searchParams.get("sortOrder") || "asc";
     const limit = 10;
     const offset = (page - 1) * limit;
 
@@ -71,10 +73,18 @@ export const GET: APIRoute = async ({ url }) => {
         // But for this API, let's keep it simple.
     }
 
+    // Apply Sorting
+    let orderBy;
+    if (sortBy === 'nis') {
+        orderBy = sortOrder === 'asc' ? asc(students.nis) : desc(students.nis);
+    } else {
+        orderBy = sortOrder === 'asc' ? asc(students.name) : desc(students.name);
+    }
+
     const studentsData = await query
       .limit(limit)
       .offset(offset)
-      .orderBy(desc(students.createdAt));
+      .orderBy(orderBy);
 
     const results = studentsData.map(s => ({
       id: s.id,

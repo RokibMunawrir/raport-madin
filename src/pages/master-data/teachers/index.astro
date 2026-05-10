@@ -4,7 +4,7 @@ import TeacherManagement from "../../../components/data/teachers";
 import { addTeacher, updateTeacher, deleteTeacher } from "../../../db/queries/teachers";
 import { db } from "../../../db";
 import { teachers } from "../../../db/schema";
-import { count, eq, like, and, desc, or } from "drizzle-orm";
+import { count, eq, like, and, desc, asc, or } from "drizzle-orm";
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
 const sessionUser = user as any;
@@ -18,6 +18,8 @@ const offset = (page - 1) * limit;
 
 const search = url.searchParams.get("search") || "";
 const statusFilter = url.searchParams.get("status") || "All";
+const sortBy = url.searchParams.get("sortBy") || "name";
+const sortOrder = url.searchParams.get("sortOrder") || "asc";
 
 // 2. Build Filters
 const filters = [];
@@ -92,13 +94,15 @@ const totalCount = totalCountResult[0]?.total || 0;
 const totalPages = Math.ceil(totalCount / limit);
 
 // 5. Fetch Paginated Teachers
+const orderColumn = sortBy === 'nip' ? teachers.nip : teachers.name;
+
 const teachersData = await db
     .select()
     .from(teachers)
     .where(filterQuery)
     .limit(limit)
     .offset(offset)
-    .orderBy(desc(teachers.createdAt));
+    .orderBy(sortOrder === 'asc' ? asc(orderColumn) : desc(orderColumn));
 
 // Transform to component's expected structure
 const initialData = teachersData.map(t => ({
@@ -130,6 +134,8 @@ const initialData = teachersData.map(t => ({
     totalCount={totalCount}
     searchQuery={search}
     statusFilter={statusFilter}
+    sortBy={sortBy}
+    sortOrder={sortOrder}
     user={sessionUser}
   />
 

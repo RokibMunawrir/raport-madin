@@ -12,7 +12,8 @@ import {
   School,
   UserPlus,
   CheckCircle2,
-  AlertCircle} from 'lucide-react';
+  AlertCircle,
+  ArrowUpDown} from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
 import { useNotification } from '../ui/notification';
@@ -103,11 +104,20 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
-  const [searchUnassigned, setSearchUnassigned] = useState('');
+  const [searchUnassigned, setSearchUnassigned] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URL(window.location.href).searchParams.get('unassignedSearch') || '';
+    }
+    return '';
+  });
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [genderFilter, setGenderFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  
+  // Sort State
+  const [classSort, setClassSort] = useState<{ key: keyof Student; order: 'asc' | 'desc' }>({ key: 'name', order: 'asc' });
+  const [unassignedSort, setUnassignedSort] = useState<{ key: keyof Student; order: 'asc' | 'desc' }>({ key: 'name', order: 'asc' });
 
   const { success, warning } = useNotification();
 
@@ -122,6 +132,11 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
       
       url.searchParams.delete('toast');
       window.history.replaceState({}, '', url.pathname + url.search);
+    }
+
+    // Auto open modal if unassigned search is active
+    if (new URL(window.location.href).searchParams.get('unassignedSearch')) {
+      setIsAssignModalOpen(true);
     }
   }, []);
 
@@ -141,8 +156,13 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
       const matchesGender = genderFilter === 'All' || s.gender === genderFilter;
       const matchesStatus = statusFilter === 'All' || s.status === statusFilter;
       return matchesSearch && matchesGender && matchesStatus;
+    }).sort((a, b) => {
+      const aVal = a[classSort.key] || '';
+      const bVal = b[classSort.key] || '';
+      if (classSort.order === 'asc') return aVal.toString().localeCompare(bVal.toString());
+      return bVal.toString().localeCompare(aVal.toString());
     });
-  }, [classStudents, searchQuery, genderFilter, statusFilter]);
+  }, [classStudents, searchQuery, genderFilter, statusFilter, classSort]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -150,13 +170,22 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
     if (statusFilter !== 'All') count++;
     return count;
   }, [genderFilter, statusFilter]);
-
   const filteredUnassigned = useMemo(() => {
     return unassignedStudents.filter(s => 
       s.name.toLowerCase().includes(searchUnassigned.toLowerCase()) || 
       s.nis.toLowerCase().includes(searchUnassigned.toLowerCase())
-    );
-  }, [unassignedStudents, searchUnassigned]);
+    ).sort((a, b) => {
+      const aVal = a[unassignedSort.key] || '';
+      const bVal = b[unassignedSort.key] || '';
+      if (unassignedSort.order === 'asc') return aVal.toString().localeCompare(bVal.toString());
+      return bVal.toString().localeCompare(aVal.toString());
+    });
+  }, [unassignedStudents, searchUnassigned, unassignedSort]);
+
+  // Display only first 100 for performance, but search works on all
+  const displayedUnassigned = useMemo(() => {
+    return filteredUnassigned.slice(0, 100);
+  }, [filteredUnassigned]);
 
   const stats = useMemo(() => {
     const total = classStudents.length;
@@ -402,8 +431,26 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Santri</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Gender</th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                        <button 
+                                            onClick={() => setClassSort({ key: 'name', order: classSort.key === 'name' && classSort.order === 'asc' ? 'desc' : 'asc' })}
+                                            className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
+                                        >
+                                            Santri
+                                            <ArrowUpDown size={12} className={classSort.key === 'name' ? 'text-indigo-600' : 'opacity-30'} />
+                                        </button>
+                                    </th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                        <div className="flex justify-center">
+                                            <button 
+                                                onClick={() => setClassSort({ key: 'gender', order: classSort.key === 'gender' && classSort.order === 'asc' ? 'desc' : 'asc' })}
+                                                className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
+                                            >
+                                                Gender
+                                                <ArrowUpDown size={12} className={classSort.key === 'gender' ? 'text-indigo-600' : 'opacity-30'} />
+                                            </button>
+                                        </div>
+                                    </th>
                                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi</th>
                                 </tr>
                             </thead>
@@ -476,12 +523,12 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center gap-4 max-w-2xl mx-auto">
               <div className="relative group flex-1 w-full">
-                <span className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                <div className="absolute inset-y-0 left-0 pl-5 flex items-center text-slate-400 pointer-events-none z-10">
                   <Search size={18} />
-                </span>
+                </div>
                 <input
                   type="text"
-                  placeholder="Cari santri..."
+                  placeholder="Cari nama atau NIS santri..."
                   className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all text-sm font-bold dark:text-slate-200"
                   value={searchUnassigned}
                   onChange={(e) => setSearchUnassigned(e.target.value)}
@@ -502,14 +549,57 @@ const ClassRoomManagement: React.FC<ClassRoomManagementProps> = ({
               </button>
             </div>
 
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {filteredUnassigned.length > 0 
+                    ? `Ditemukan ${filteredUnassigned.length} santri ${filteredUnassigned.length > 100 ? `(Menampilkan 100 pertama)` : ''}`
+                    : 'Tidak ada santri'
+                  }
+                </p>
+                {filteredUnassigned.length > 0 && (
+                  <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-4">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Urut:</span>
+                    <button 
+                      onClick={() => setUnassignedSort({ key: 'name', order: unassignedSort.key === 'name' && unassignedSort.order === 'asc' ? 'desc' : 'asc' })}
+                      className={`text-[10px] font-black uppercase tracking-widest transition-colors ${unassignedSort.key === 'name' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Nama
+                    </button>
+                    <button 
+                      onClick={() => setUnassignedSort({ key: 'nis', order: unassignedSort.key === 'nis' && unassignedSort.order === 'asc' ? 'desc' : 'asc' })}
+                      className={`text-[10px] font-black uppercase tracking-widest transition-colors ${unassignedSort.key === 'nis' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      NIS
+                    </button>
+                    <button 
+                      onClick={() => setUnassignedSort({ key: 'gender', order: unassignedSort.key === 'gender' && unassignedSort.order === 'asc' ? 'desc' : 'asc' })}
+                      className={`text-[10px] font-black uppercase tracking-widest transition-colors ${unassignedSort.key === 'gender' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Gender
+                    </button>
+                  </div>
+                )}
+              </div>
+              {searchUnassigned && (
+                <button 
+                  onClick={() => setSearchUnassigned('')}
+                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                >
+                  Bersihkan Pencarian
+                </button>
+              )}
+            </div>
+            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto px-2 custom-scrollbar">
-              {filteredUnassigned.length === 0 ? (
+              {displayedUnassigned.length === 0 ? (
                 <div className="col-span-full py-12 text-center text-slate-400 flex flex-col items-center">
                   <CheckCircle2 size={48} className="mb-4 opacity-20" />
-                  <p className="text-sm font-bold uppercase tracking-widest">Semua santri telah memiliki kelas</p>
+                  <p className="text-sm font-bold uppercase tracking-widest">Tidak ada santri ditemukan</p>
                 </div>
               ) : (
-                filteredUnassigned.map(student => (
+                displayedUnassigned.map(student => (
                   <div key={student.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all group shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center">

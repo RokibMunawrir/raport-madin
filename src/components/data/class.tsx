@@ -12,10 +12,12 @@ import {
   UserCheck,
   ChevronDown,
   LayoutGrid,
-  Check,
-  AlertCircle,
   HelpCircle,
-  MoreVertical} from 'lucide-react';
+  MoreVertical,
+  ArrowUpDown,
+  Check,
+  AlertCircle
+} from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Pagination from '../ui/pagination';
 import Modal from '../ui/modal';
@@ -53,6 +55,8 @@ interface ClassManagementProps {
   searchQuery?: string;
   levelFilter?: string;
   genderFilter?: string;
+  sortBy?: string;
+  sortOrder?: string;
   user?: any;
 }
 
@@ -165,6 +169,8 @@ const ClassManagement: React.FC<ClassManagementProps> = ({
   searchQuery: initialSearchQuery = '',
   levelFilter: initialLevelFilter = 'All',
   genderFilter: initialGenderFilter = 'All',
+  sortBy = 'name',
+  sortOrder = 'asc',
   user
 }) => {
 
@@ -354,7 +360,15 @@ const ClassManagement: React.FC<ClassManagementProps> = ({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Informasi Kelas</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <button 
+                      onClick={() => updateFilters({ sortBy: 'name', sortOrder: sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                      className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
+                    >
+                      Informasi Kelas
+                      <ArrowUpDown size={12} className={sortBy === 'name' ? 'text-indigo-600' : 'opacity-30'} />
+                    </button>
+                  </th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Karakteristik</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Wali Kelas</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Kapasitas</th>

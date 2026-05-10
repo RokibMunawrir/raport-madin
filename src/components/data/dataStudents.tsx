@@ -16,7 +16,8 @@ import {
   Eye,
   Upload,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ArrowUpDown
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Pagination from '../ui/pagination';
@@ -152,6 +153,8 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
   const [classFilter, setClassFilter] = useState(initialClassFilter);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   // Import State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -197,6 +200,8 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
         if (genderFilter !== 'All') params.set('gender', genderFilter);
         if (classFilter !== 'All') params.set('class', classFilter);
         params.set('page', currentPage.toString());
+        params.set('sortBy', sortBy);
+        params.set('sortOrder', sortOrder);
 
         const response = await fetch(`/api/students/search?${params.toString()}`);
         const result = await response.json();
@@ -233,7 +238,7 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, genderFilter, classFilter, currentPage]);
+  }, [searchQuery, statusFilter, genderFilter, classFilter, currentPage, sortBy, sortOrder]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -284,6 +289,8 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
     if (newParams.status !== undefined) setStatusFilter(newParams.status);
     if (newParams.gender !== undefined) setGenderFilter(newParams.gender);
     if (newParams.class !== undefined) setClassFilter(newParams.class);
+    if (newParams.sortBy !== undefined) setSortBy(newParams.sortBy);
+    if (newParams.sortOrder !== undefined) setSortOrder(newParams.sortOrder);
     if (newParams.page !== undefined) setCurrentPage(parseInt(newParams.page));
     // Reset page to 1 if filter changes but not page
     if (newParams.page === undefined) setCurrentPage(1);
@@ -294,6 +301,8 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
     setStatusFilter('All');
     setGenderFilter('All');
     setClassFilter('All');
+    setSortBy('name');
+    setSortOrder('asc');
     setCurrentPage(1);
   };
 
@@ -471,7 +480,24 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Informasi Santri</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => updateFilters({ sortBy: 'name', sortOrder: sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
+                      >
+                        Informasi Santri
+                        <ArrowUpDown size={12} className={sortBy === 'name' ? 'text-indigo-600' : 'opacity-30'} />
+                      </button>
+                      <button 
+                        onClick={() => updateFilters({ sortBy: 'nis', sortOrder: sortBy === 'nis' && sortOrder === 'asc' ? 'desc' : 'asc' })}
+                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
+                      >
+                        (NIS)
+                        <ArrowUpDown size={12} className={sortBy === 'nis' ? 'text-indigo-600' : 'opacity-30'} />
+                      </button>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Penempatan</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose">Detail & Wali</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
