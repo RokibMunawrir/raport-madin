@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, timestamp, date, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, pgEnum, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -32,6 +32,12 @@ export const teachers = pgTable("teachers", {
   avatar: text("avatar"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    teacherStatusIdx: index("teacher_status_idx").on(table.status),
+    teacherNipIdx: index("teacher_nip_idx").on(table.nip),
+    teacherNameIdx: index("teacher_name_idx").on(table.name),
+  }
 });
 
 export const academicYears = pgTable("academic_years", {
@@ -44,6 +50,10 @@ export const academicYears = pgTable("academic_years", {
   endDate: date("end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    academicYearIsActiveIdx: index("academic_year_is_active_idx").on(table.isActive),
+  }
 });
 
 export const dormitories = pgTable("dormitories", {
@@ -56,6 +66,10 @@ export const dormitories = pgTable("dormitories", {
   capacity: integer("capacity").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    dormitoryGenderIdx: index("dormitory_gender_idx").on(table.gender),
+  }
 });
 
 export const regions = pgTable("regions", {
@@ -75,6 +89,12 @@ export const classrooms = pgTable("classrooms", {
   teacherId: varchar("teacher_id", { length: 21 }).references(() => teachers.id), // Wali Kelas
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    classroomTeacherIdx: index("classroom_teacher_idx").on(table.teacherId),
+    classroomLevelIdx: index("classroom_level_idx").on(table.level),
+    classroomGenderIdx: index("classroom_gender_idx").on(table.gender),
+  }
 });
 
 // ==========================================
@@ -103,6 +123,14 @@ export const students = pgTable("students", {
   avatar: text("avatar"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    studentStatusIdx: index("student_status_idx").on(table.status),
+    studentDormitoryIdx: index("student_dormitory_idx").on(table.dormitoryId),
+    studentGenderIdx: index("student_gender_idx").on(table.gender),
+    studentNameIdx: index("student_name_idx").on(table.name),
+    studentNisnIdx: index("student_nisn_idx").on(table.nisn),
+  }
 });
 
 // Menghubungkan Siswa dengan Kelas per Tahun Ajaran (History)
@@ -112,6 +140,12 @@ export const studentClassrooms = pgTable("student_classrooms", {
   classroomId: varchar("classroom_id", { length: 21 }).references(() => classrooms.id).notNull(),
   academicYearId: varchar("academic_year_id", { length: 21 }).references(() => academicYears.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    studentClassroomStudentIdx: index("student_classroom_student_idx").on(table.studentId),
+    studentClassroomClassroomIdx: index("student_classroom_classroom_idx").on(table.classroomId),
+    studentClassroomAcademicYearIdx: index("student_classroom_academic_year_idx").on(table.academicYearId),
+  }
 });
 
 // Mata Pelajaran (Subjects)
@@ -126,6 +160,11 @@ export const subjects = pgTable("subjects", {
   icon: varchar("icon", { length: 50 }).default("BookOpen"), // Lucide icon name
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    subjectStatusIdx: index("subject_status_idx").on(table.status),
+    subjectLevelIdx: index("subject_level_idx").on(table.level),
+  }
 });
 
 // Penugasan Pengajaran (Teaching Assignments)
@@ -140,6 +179,13 @@ export const teachingAssignments = pgTable("teaching_assignments", {
   session: integer("session"), // 1, 2, or 3
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    teachingAssignmentTeacherIdx: index("teaching_assignment_teacher_idx").on(table.teacherId),
+    teachingAssignmentSubjectIdx: index("teaching_assignment_subject_idx").on(table.subjectId),
+    teachingAssignmentClassroomIdx: index("teaching_assignment_classroom_idx").on(table.classroomId),
+    teachingAssignmentAcademicYearIdx: index("teaching_assignment_academic_year_idx").on(table.academicYearId),
+  }
 });
 
 // Target Hafalan (Memorize Targets)
@@ -152,6 +198,10 @@ export const memorizeTargets = pgTable("memorize_targets", {
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    memorizeTargetCategoryIdx: index("memorize_target_category_idx").on(table.category),
+  }
 });
 
 // ==========================================
@@ -171,6 +221,9 @@ export const attendances = pgTable("attendances", {
 }, (table) => {
   return {
     attendanceUniqueIdx: uniqueIndex("attendance_unique_idx").on(table.studentId, table.date, table.session),
+    attendanceStudentIdx: index("attendance_student_idx").on(table.studentId),
+    attendanceDateIdx: index("attendance_date_idx").on(table.date),
+    attendanceAcademicYearIdx: index("attendance_academic_year_idx").on(table.academicYearId),
   }
 });
 
@@ -187,6 +240,12 @@ export const achievements = pgTable("achievements", {
   score: integer("score").default(0), // Points / Nilai
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    achievementStudentIdx: index("achievement_student_idx").on(table.studentId),
+    achievementAcademicYearIdx: index("achievement_academic_year_idx").on(table.academicYearId),
+    achievementDateIdx: index("achievement_date_idx").on(table.date),
+  }
 });
 
 export const scores = pgTable("scores", {
@@ -198,6 +257,12 @@ export const scores = pgTable("scores", {
   semester: integer("semester").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    scoreStudentIdx: index("score_student_idx").on(table.studentId),
+    scoreSubjectIdx: index("score_subject_idx").on(table.subjectId),
+    scoreAcademicYearIdx: index("score_academic_year_idx").on(table.academicYearId),
+  }
 });
 
 export const studentNotes = pgTable("student_notes", {
@@ -207,6 +272,11 @@ export const studentNotes = pgTable("student_notes", {
   content: text("content"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    studentNoteStudentIdx: index("student_note_student_idx").on(table.studentId),
+    studentNoteAcademicYearIdx: index("student_note_academic_year_idx").on(table.academicYearId),
+  }
 });
 
 // ==========================================
@@ -221,6 +291,11 @@ export const activityLogs = pgTable("activity_logs", {
   userId: varchar("user_id", { length: 21 }), // Reference to user/teacher if needed
   module: varchar("module", { length: 100 }), // e.g., "Sistem", "Akademik", "Admin"
   createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    activityLogCreatedAtIdx: index("activity_log_created_at_idx").on(table.createdAt),
+    activityLogModuleIdx: index("activity_log_module_idx").on(table.module),
+  }
 });
 
 export const systemMetrics = pgTable("system_metrics", {
@@ -229,6 +304,10 @@ export const systemMetrics = pgTable("system_metrics", {
   description: text("description"), // e.g., "Normal • Latency 12ms"
   status: varchar("status", { length: 50 }).notNull(), // e.g., "Online", "Stabil", "Peringatan"
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+}, (table) => {
+  return {
+    systemMetricLastUpdatedIdx: index("system_metric_last_updated_idx").on(table.lastUpdated),
+  }
 });
 
 // ==========================================
@@ -378,6 +457,8 @@ export const teacherAttendances = pgTable("teacher_attendances", {
 }, (table) => {
   return {
     teacherAttendanceUniqueIdx: uniqueIndex("teacher_attendance_unique_idx").on(table.teacherId, table.subjectId, table.classroomId, table.date, table.session),
+    teacherAttendanceTeacherIdx: index("teacher_attendance_teacher_idx").on(table.teacherId),
+    teacherAttendanceDateIdx: index("teacher_attendance_date_idx").on(table.date),
   }
 });
 

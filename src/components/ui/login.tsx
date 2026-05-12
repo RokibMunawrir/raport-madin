@@ -76,7 +76,7 @@ const LoginForm: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-2xl font-bold tracking-tight">Raport Madin</span>
-                <span className="text-xs font-medium text-indigo-100 uppercase tracking-widest">Digital Academic</span>
+                <span className="text-xs font-medium text-indigo-100 uppercase tracking-widest">MDT Al Amiriyyah</span>
               </div>
             </div>
             
@@ -85,7 +85,7 @@ const LoginForm: React.FC = () => {
               <span className="text-indigo-200">Lebih Mudah & Modern</span>
             </h1>
             <p className="text-indigo-100 text-lg leading-relaxed max-w-md">
-              Platform manajemen pendidikan terintegrasi untuk Madrasah Diniyah. Pantau perkembangan santri secara real-time.
+              Platform manajemen pendidikan terintegrasi untuk Madrasah Diniyyah Takmiliyyah Al Amiriyyah. Pantau perkembangan santri secara real-time.
             </p>
           </div>
           

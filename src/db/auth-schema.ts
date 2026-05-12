@@ -14,6 +14,11 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+}, (table) => {
+  return {
+    userTeacherIdIdx: index("user_teacher_id_idx").on(table.teacherId),
+    userRoleIdx: index("user_role_idx").on(table.role),
+  }
 });
 
 export const session = pgTable(

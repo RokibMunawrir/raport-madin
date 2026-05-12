@@ -447,13 +447,26 @@ const TeachingManagement: React.FC<TeachingManagementProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] pl-1">Sesi (Jam Ke)</label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pl-1">
+                      <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Sesi (Jam Ke)</label>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const checkboxes = document.querySelectorAll<HTMLInputElement>('input[name="session"]');
+                          const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                          checkboxes.forEach(cb => cb.checked = !allChecked);
+                        }}
+                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors"
+                      >
+                        Pilih Semua
+                      </button>
+                    </div>
                     <div className="grid grid-cols-3 gap-3">
                       {[1, 2, 3].map((num) => (
                         <label key={num} className="relative flex items-center justify-center p-4 border border-slate-200 dark:border-slate-700 rounded-2xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all has-[:checked]:bg-indigo-600 has-[:checked]:border-indigo-600 has-[:checked]:text-white group">
                           <input 
-                            type="radio" 
+                            type="checkbox" 
                             name="session" 
                             value={num} 
                             defaultChecked={editingAssignment?.session === num || (!editingAssignment && num === 1)}

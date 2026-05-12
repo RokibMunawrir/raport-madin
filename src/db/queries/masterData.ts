@@ -167,6 +167,17 @@ export async function addTeachingAssignment(data: typeof teachingAssignments.$in
   return result[0];
 }
 
+export async function addBulkTeachingAssignments(data: (typeof teachingAssignments.$inferInsert)[]) {
+  const result = await db.insert(teachingAssignments).values(data).returning({ id: teachingAssignments.id });
+  await db.insert(activityLogs).values({
+    title: 'Tambah Penugasan Mengajar (Bulk)',
+    description: `${data.length} penugasan baru telah dibuat.`,
+    type: 'success',
+    module: 'Akademik',
+  });
+  return result;
+}
+
 export async function updateTeachingAssignment(id: string, data: Partial<typeof teachingAssignments.$inferInsert>) {
     await db.update(teachingAssignments).set({ ...data, updatedAt: new Date() }).where(eq(teachingAssignments.id, id));
     await db.insert(activityLogs).values({

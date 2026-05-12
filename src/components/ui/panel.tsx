@@ -88,6 +88,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     localStorage.setItem('sidebar-minimized', String(isMinimized));
   }, [isMinimized]);
 
+  // Idle Timer Logic (5 minutes)
+  useEffect(() => {
+    if (!user) return;
+
+    let idleTimeout: NodeJS.Timeout;
+    const IDLE_TIME = 5 * 60 * 1000; // 5 minutes
+
+    const resetTimer = () => {
+      clearTimeout(idleTimeout);
+      idleTimeout = setTimeout(() => {
+        handleLogout();
+      }, IDLE_TIME);
+    };
+
+    // Events to track activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    // Add event listeners
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Initial start
+    resetTimer();
+
+    return () => {
+      // Cleanup
+      clearTimeout(idleTimeout);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [user]);
+
   const navItems = [
     { name: 'Dashboard', icon: <LayoutDashboard size={20} />, href: '/dashboard' },
     { name: 'Siswa', icon: <Users size={20} />, href: '/students' },

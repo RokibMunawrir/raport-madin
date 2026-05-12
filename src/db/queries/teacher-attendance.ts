@@ -1,5 +1,5 @@
 import { db } from "../index";
-import { teacherAttendances, teachingAssignments, teachers, subjects, activityLogs } from "../schema";
+import { teacherAttendances, teachingAssignments, teachers, subjects, activityLogs, classrooms } from "../schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export async function getTeacherAttendanceByDateAndClass(dateStr: string, classroomId: string) {
@@ -31,6 +31,45 @@ export async function getTeacherAttendanceByDateAndClass(dateStr: string, classr
         eq(teacherAttendances.classroomId, classroomId),
         eq(teacherAttendances.date, dateStr)
     ));
+
+  return {
+    assignments,
+    attendance: existingAttendance,
+  };
+}
+
+export async function getTeacherAttendanceByDate(dateStr: string) {
+  const days = ["Ahad", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  const date = new Date(dateStr);
+  const dayName = days[date.getDay()];
+
+  // 1. Get all teaching assignments for this day
+  const assignments = await db
+    .select({
+      id: teachingAssignments.id,
+      teacherId: teachingAssignments.teacherId,
+      teacherName: teachers.name,
+      teacherAvatar: teachers.avatar,
+      subjectId: teachingAssignments.subjectId,
+      subjectName: subjects.name,
+      classroomId: teachingAssignments.classroomId,
+      classroomName: classrooms.name,
+      academicYearId: teachingAssignments.academicYearId,
+      day: teachingAssignments.day,
+      period: teachingAssignments.period,
+      session: teachingAssignments.session,
+    })
+    .from(teachingAssignments)
+    .innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id))
+    .innerJoin(subjects, eq(teachingAssignments.subjectId, subjects.id))
+    .innerJoin(classrooms, eq(teachingAssignments.classroomId, classrooms.id))
+    .where(eq(teachingAssignments.day, dayName));
+
+  // 2. Get attendance for those assignments on that date
+  const existingAttendance = await db
+    .select()
+    .from(teacherAttendances)
+    .where(eq(teacherAttendances.date, dateStr));
 
   return {
     assignments,

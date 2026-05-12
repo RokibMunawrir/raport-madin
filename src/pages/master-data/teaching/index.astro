@@ -16,14 +16,13 @@ if (Astro.request.method === "POST") {
         const formData = await Astro.request.formData();
         const action = formData.get("_action") as string;
         const id = formData.get("id") as string;
-
-        const assignmentData = {
+        const sessions = formData.getAll("session").map(s => parseInt(s as string) || 1);
+        const baseAssignment = {
             teacherId: formData.get("teacherId") as string,
             subjectId: formData.get("subjectId") as string,
             classroomId: formData.get("classroomId") as string,
             day: formData.get("day") as string,
             period: formData.get("period") as string,
-            session: parseInt(formData.get("session") as string) || 1,
         };
 
         let successStatus = "";
@@ -32,10 +31,19 @@ if (Astro.request.method === "POST") {
             await deleteTeachingAssignment(id);
             successStatus = "deleted";
         } else if (action === "edit" && id) {
-            await updateTeachingAssignment(id, assignmentData);
+            await updateTeachingAssignment(id, { ...baseAssignment, session: sessions[0] || 1 });
             successStatus = "updated";
         } else if (action === "add") {
-            await addTeachingAssignment(assignmentData);
+            const assignmentsToCreate = sessions.map(s => ({
+                ...baseAssignment,
+                session: s
+            }));
+            
+            if (assignmentsToCreate.length > 1) {
+                await import("../../../db/queries/masterData").then(m => m.addBulkTeachingAssignments(assignmentsToCreate));
+            } else if (assignmentsToCreate.length === 1) {
+                await addTeachingAssignment(assignmentsToCreate[0]);
+            }
             successStatus = "added";
         }
 

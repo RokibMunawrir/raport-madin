@@ -33,6 +33,7 @@ interface TeacherAssignment {
     subjectId: string;
     subjectName: string;
     classroomId: string;
+    classroomName?: string;
     academicYearId: string;
     day: string;
     period: string;
@@ -42,7 +43,7 @@ interface TeacherAssignment {
 type DailyPresence = [PresenceStatus, PresenceStatus, PresenceStatus];
 
 interface TeacherPresenceData {
-  [assignmentKey: string]: DailyPresence; // Key: `${teacherId}-${subjectId}`
+  [assignmentKey: string]: PresenceStatus; // Key: `${teacherId}-${subjectId}-${classroomId}-${session}`
 }
 
 interface Classroom {
@@ -63,7 +64,7 @@ interface TeacherPresenceProps {
 }
 
 // --- Utilities ---
-const getAssignmentKey = (teacherId: string, subjectId: string) => `${teacherId}-${subjectId}`;
+const getAssignmentKey = (teacherId: string, subjectId: string, classroomId: string, session: number) => `${teacherId}-${subjectId}-${classroomId}-${session}`;
 
 const formatName = (name: string) => {
   const words = name.trim().split(/\s+/);
@@ -90,8 +91,8 @@ const StatCard: React.FC<{ label: string; value: number; icon: React.ReactNode; 
 
 const TeacherPresenceItem: React.FC<{ 
   assignment: TeacherAssignment; 
-  status: DailyPresence; 
-  onStatusChange: (hourIndex: number, status: PresenceStatus) => void 
+  status: PresenceStatus; 
+  onStatusChange: (status: PresenceStatus) => void 
 }> = ({ assignment, status, onStatusChange }) => {
   const commonBtnClass = "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black transition-all border-2";
   
@@ -123,6 +124,11 @@ const TeacherPresenceItem: React.FC<{
         </div>
       </td>
       <td className="px-6 py-4 text-center">
+        <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20 inline-block min-w-[70px]">
+          {assignment.classroomName || assignment.classroomId}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-center">
         <div className="inline-flex flex-col items-center">
             <span className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300">
                 {assignment.day}
@@ -133,30 +139,18 @@ const TeacherPresenceItem: React.FC<{
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex flex-wrap 2xl:flex-nowrap items-center justify-center gap-4 lg:gap-6">
-          {[0, 1, 2].map((hourIndex) => {
-            const isAssigned = assignment.session === (hourIndex + 1);
-            return (
-              <div key={hourIndex} className={`flex flex-col items-center gap-1.5 p-2 ${isAssigned ? 'bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/30 ring-2 ring-indigo-500/10' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-700/50 opacity-60'} rounded-2xl border shadow-sm transition-all`}>
-                <p className={`text-[9px] font-black uppercase tracking-widest ${isAssigned ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
-                  Jam Ke-{hourIndex + 1} {isAssigned && "(Wajib)"}
-                </p>
-                <div className="flex items-center gap-1.5">
-                  {(['H', 'I', 'S', 'A'] as PresenceStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => onStatusChange(hourIndex, s)}
-                      className={`${commonBtnClass} ${status[hourIndex] === s ? statusConfig[s].active : statusConfig[s].inactive}`}
-                      title={s === 'H' ? 'Hadir' : s === 'I' ? 'Izin' : s === 'S' ? 'Sakit' : 'Alpa'}
-                    >
-                      {statusConfig[s].label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex items-center justify-center gap-2">
+          {(['H', 'I', 'S', 'A'] as PresenceStatus[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onStatusChange(s)}
+              className={`${commonBtnClass} ${status === s ? statusConfig[s].active : statusConfig[s].inactive}`}
+              title={s === 'H' ? 'Hadir' : s === 'I' ? 'Izin' : s === 'S' ? 'Sakit' : 'Alpa'}
+            >
+              {statusConfig[s].label}
+            </button>
+          ))}
         </div>
       </td>
     </tr>
@@ -174,7 +168,7 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
 }) => {
 
   const [date, setDate] = useState(propDate);
-  const [classId, setClassId] = useState(propClassId);
+  const [selectedClassId, setSelectedClassId] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [presence, setPresence] = useState<TeacherPresenceData>(initialPresence);
   const [loading, setLoading] = useState(false);
@@ -191,7 +185,7 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
     } else {
       setIsFetchingRekap(true);
       try {
-        const response = await fetch(`/api/presence/rekap?classId=${classId}&type=${printType}&date=${date}&userType=teacher`);
+        const response = await fetch(`/api/presence/rekap?classId=${selectedClassId}&type=${printType}&date=${date}&userType=teacher`);
         const data = await response.json();
         if (data.error) throw new Error(data.error);
         
@@ -213,18 +207,16 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
     setPresence(initialPresence);
   }, [initialPresence]);
 
-  // Handle URL updates when date or class changes
-  const handleFilterChange = (newDate: string, newClassId: string) => {
-    window.location.href = `/presence-asatidz?date=${newDate}&classroom=${newClassId}`;
+  // Handle URL updates when date changes
+  const handleFilterChange = (newDate: string) => {
+    window.location.href = `/presence-asatidz?date=${newDate}`;
   };
 
   // Stats calculation
   const stats = useMemo(() => {
     const counts = { total: initialAssignments.length, H: 0, I: 0, S: 0, A: 0 };
-    Object.values(presence).forEach((statuses) => {
-      statuses.forEach(status => {
-         counts[status]++;
-      });
+    Object.values(presence).forEach((status) => {
+       counts[status]++;
     });
     return counts;
   }, [presence, initialAssignments]);
@@ -234,23 +226,20 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
     return initialAssignments.filter(a => {
       const matchesSearch = a.teacherName.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            a.subjectName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      const matchesClass = selectedClassId === 'All' || a.classroomId === selectedClassId;
+      return matchesSearch && matchesClass;
     });
-  }, [searchQuery, initialAssignments]);
+  }, [searchQuery, selectedClassId, initialAssignments]);
 
-  const handleStatusChange = (assignmentKey: string, hourIndex: number, status: PresenceStatus) => {
-    setPresence(prev => {
-       const currentFocus = prev[assignmentKey] ? [...prev[assignmentKey]] as DailyPresence : ['H', 'H', 'H'] as DailyPresence;
-       currentFocus[hourIndex] = status;
-       return { ...prev, [assignmentKey]: currentFocus };
-    });
+  const handleStatusChange = (assignmentKey: string, status: PresenceStatus) => {
+    setPresence(prev => ({ ...prev, [assignmentKey]: status }));
   };
 
   const handleMarkAllPresent = () => {
     const newPresence = { ...presence };
     filteredAssignments.forEach(a => {
-      const key = getAssignmentKey(a.teacherId, a.subjectId);
-      newPresence[key] = ['H', 'H', 'H'];
+      const key = getAssignmentKey(a.teacherId, a.subjectId, a.classroomId, a.session || 0);
+      newPresence[key] = 'H';
     });
     setPresence(newPresence);
   };
@@ -262,28 +251,27 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
     const changes: any[] = [];
     
     Object.keys(presence).forEach(key => {
-        const [teacherId, subjectId] = key.split('-');
+        const [teacherId, subjectId, classroomId, sessionStr] = key.split('-');
+        const session = parseInt(sessionStr);
         const current = presence[key];
         const initial = initialPresence[key];
         
-        const assignment = initialAssignments.find(a => a.teacherId === teacherId && a.subjectId === subjectId);
+        const assignment = initialAssignments.find(a => a.teacherId === teacherId && a.subjectId === subjectId && a.classroomId === classroomId && a.session === session);
         if (!assignment) return;
 
-        // Determine if we should send this record (if it's different from initial or new)
-        const isDifferent = !initial || current.some((status, idx) => status !== initial[idx]);
+        // Determine if we should send this record (if it's different from initial)
+        const isDifferent = !initial || current !== initial;
         
         if (isDifferent) {
-            current.forEach((status, idx) => {
-                changes.push({
-                    teacherId,
-                    subjectId,
-                    classroomId: assignment.classroomId,
-                    academicYearId: assignment.academicYearId,
-                    date: date,
-                    session: idx + 1,
-                    status: status === 'H' ? 'Hadir' : status === 'I' ? 'Izin' : status === 'S' ? 'Sakit' : 'Alpha',
-                    notes: ""
-                });
+            changes.push({
+                teacherId,
+                subjectId,
+                classroomId: assignment.classroomId,
+                academicYearId: assignment.academicYearId,
+                date: date,
+                session: session,
+                status: current === 'H' ? 'Hadir' : current === 'I' ? 'Izin' : current === 'S' ? 'Sakit' : 'Alpha',
+                notes: ""
             });
         }
     });
@@ -344,22 +332,8 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
                     type="date"
                     className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-slate-300"
                     value={date}
-                    onChange={(e) => handleFilterChange(e.target.value, classId)}
+                    onChange={(e) => handleFilterChange(e.target.value)}
                 />
-                </div>
-
-                {/* Class Filter */}
-                <div className="relative w-full sm:max-w-[180px]">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Filter size={18} />
-                </span>
-                <select
-                    className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-slate-300 appearance-none"
-                    value={classId}
-                    onChange={(e) => handleFilterChange(date, e.target.value)}
-                >
-                    {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
                 </div>
 
                 {/* Search */}
@@ -374,6 +348,21 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                </div>
+
+                {/* Class Filter */}
+                <div className="relative w-full sm:max-w-[180px]">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Filter size={18} />
+                </span>
+                <select
+                    className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-slate-300 appearance-none"
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                >
+                    <option value="All">Semua Kelas</option>
+                    {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
                 </div>
             </div>
 
@@ -407,43 +396,62 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
             </div>
         </div>
 
-        {/* Main Table */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-                <thead>
-                <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asatidz & Mata Pelajaran</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Jadwal</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Keaktifan (H/I/S/A)</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {filteredAssignments.length > 0 ? (
-                    filteredAssignments.map((a) => {
-                        const key = getAssignmentKey(a.teacherId, a.subjectId);
+        {/* Session-based Tables */}
+        {[1, 2, 3].map((session) => {
+          const sessionAssignments = filteredAssignments.filter(a => a.session === session);
+          if (sessionAssignments.length === 0) return null;
+
+          return (
+            <div key={session} className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20 font-black">
+                  {session}
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">Jam Ke-{session}</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Daftar Pengajar Sesi {session}</p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asatidz & Mata Pelajaran</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Kelas</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Periode</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Keaktifan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {sessionAssignments.map((a) => {
+                        const key = getAssignmentKey(a.teacherId, a.subjectId, a.classroomId, a.session || 0);
                         return (
-                            <TeacherPresenceItem 
-                                key={a.id} 
-                                assignment={a} 
-                                status={presence[key] || ['H', 'H', 'H']} 
-                                onStatusChange={(hourIndex, status) => handleStatusChange(key, hourIndex, status)} 
-                            />
+                          <TeacherPresenceItem 
+                            key={a.id} 
+                            assignment={a} 
+                            status={presence[key] || 'H'} 
+                            onStatusChange={(status) => handleStatusChange(key, status)} 
+                          />
                         );
-                    })
-                ) : (
-                    <tr>
-                    <td colSpan={3} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center gap-2">
-                        <Search size={40} className="text-slate-200 dark:text-slate-700" />
-                        <p className="text-sm font-bold text-slate-400">Data tidak tersedia untuk filter ini</p>
-                        </div>
-                    </td>
-                    </tr>
-                )}
-                </tbody>
-            </table>
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
+          );
+        })}
+
+        {filteredAssignments.length === 0 && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-20 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <Search size={40} className="text-slate-200 dark:text-slate-700" />
+              <p className="text-sm font-bold text-slate-400">Tidak ada jadwal pengajar ditemukan</p>
+            </div>
+          </div>
+        )}
 
             {/* Footer Info */}
             <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
@@ -458,11 +466,10 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div><span className="text-amber-600">Sakit</span></div>
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-500"></div><span className="text-rose-600">Alpha</span></div>
                 </div>
-                </div>
+            </div>
             </div>
             </div>
         </div>
-      </div>
     </AdminPanel>
 
     {/* Printable Area */}
@@ -480,7 +487,7 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
             <div className="flex">
               <span className="w-24">Kelas</span>
               <span className="mr-2">:</span>
-              <span className="font-bold">{classrooms.find(c => c.id === classId)?.name || '-'}</span>
+              <span className="font-bold">{selectedClassId === 'All' ? 'Semua Kelas' : classrooms.find(c => c.id === selectedClassId)?.name || '-'}</span>
             </div>
             <div className="flex">
               <span className="w-24">Tanggal</span>
@@ -509,16 +516,14 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
           </thead>
           <tbody>
             {filteredAssignments.map((a, index) => {
-              const key = getAssignmentKey(a.teacherId, a.subjectId);
+              const key = getAssignmentKey(a.teacherId, a.subjectId, a.classroomId, a.session || 0);
               return (
                 <tr key={a.id}>
                   <td className="border border-black px-2 py-2 text-center">{index + 1}</td>
                   <td className="border border-black px-4 py-2 uppercase font-medium">{a.teacherName}</td>
                   <td className="border border-black px-4 py-2">{a.subjectName}</td>
-                  <td className="border border-black px-4 py-2 text-center text-[9pt]">{a.day}, {a.period}</td>
-                  <td className="border border-black px-2 py-2 text-center font-bold">{presence[key]?.[0] || 'H'}</td>
-                  <td className="border border-black px-2 py-2 text-center font-bold">{presence[key]?.[1] || 'H'}</td>
-                  <td className="border border-black px-2 py-2 text-center font-bold">{presence[key]?.[2] || 'H'}</td>
+                  <td className="border border-black px-4 py-2 text-center text-[9pt]">{a.day}, {a.period} (Jam {a.session})</td>
+                  <td colSpan={3} className="border border-black px-2 py-2 text-center font-bold">{presence[key] || 'H'}</td>
                 </tr>
               );
             })}
@@ -575,7 +580,7 @@ const TeacherPresenceManagement: React.FC<TeacherPresenceProps> = ({
               <div className="flex">
                 <span className="w-24">Kelas</span>
                 <span className="mr-2">:</span>
-                <span className="font-bold">{classrooms.find(c => c.id === classId)?.name || '-'}</span>
+                <span className="font-bold">{selectedClassId === 'All' ? 'Semua Kelas' : classrooms.find(c => c.id === selectedClassId)?.name || '-'}</span>
               </div>
               <div className="flex">
                 <span className="w-24">Periode</span>
