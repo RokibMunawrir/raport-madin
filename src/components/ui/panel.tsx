@@ -25,6 +25,7 @@ import {
 import ThemeController from './themeController';
 import { authClient } from '../../lib/auth-client';
 import { NotificationProvider } from './notification';
+import madin from '../../assets/madin.png';
 
 interface AdminPanelProps {
   title?: string;
@@ -40,7 +41,7 @@ interface AdminPanelProps {
 
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  title = 'Academia Curator', 
+  title = 'MDT Al Amiriyyah', 
   children,
   activeItem: externalActiveItem,
   setActiveItem: externalSetActiveItem,
@@ -187,16 +188,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               <X size={18} />
             </button>
             <div className={`flex items-center ${isMinimized && !isMobileOpen ? 'justify-center' : 'gap-3'} h-20 px-6 border-b border-slate-100 dark:border-slate-700/50 flex-shrink-0`}>
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-none">
-                <Database size={24} className="text-white" />
+              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                <img src={madin.src} alt="Logo" className="w-10 h-10" />
               </div>
               {( !isMinimized || isMobileOpen ) && (
                 <div className="flex flex-col min-w-0 transition-opacity duration-300">
                   <span className="text-lg font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap leading-none mb-1">
-                    Raport Madin
+                    RAPORT MADIN
                   </span>
                   <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest leading-none">
-                    ACADEMIC MANAGEMENT
+                    MDT AL AMIRIYYAH
                   </span>
                 </div>
               )}

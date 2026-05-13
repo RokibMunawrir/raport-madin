@@ -10,6 +10,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { authClient } from '../../lib/auth-client';
+import madin from '../../assets/madin.png';
 
 const LoginForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -71,8 +72,8 @@ const LoginForm: React.FC = () => {
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-10">
-              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Database size={28} className="text-white" />
+              <div className="w-12 h-12 flex items-center justify-center">
+                <img src={madin.src} alt="Logo" className="w-12 h-12" />
               </div>
               <div className="flex flex-col">
                 <span className="text-2xl font-bold tracking-tight">Raport Madin</span>
