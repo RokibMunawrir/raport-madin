@@ -7,6 +7,6 @@ if (!user) return Astro.redirect('/login');
 const sessionUser = user as any;
 ---
 
-<Layout title="Panduan - Raport Madin">
+<Layout title="Panduan Penggunaan | Raport MDT Al-Amiriyyah">
 	<GuidelinesComponent client:only="react" user={sessionUser} />
 </Layout>

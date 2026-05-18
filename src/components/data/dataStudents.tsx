@@ -17,11 +17,13 @@ import {
   Upload,
   Download,
   FileSpreadsheet,
-  ArrowUpDown
+  ArrowUpDown,
+  AlertCircle
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Pagination from '../ui/pagination';
 import Modal from '../ui/modal';
+import { useNotification } from '../ui/notification';
 
 
 // --- Types ---
@@ -161,6 +163,26 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{message?: string, error?: string, details?: {row: number, column: string, message: string}[]} | null>(null);
+
+  // Delete State & Notifications
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
+  const { success, error, info, warning } = useNotification();
+
+  // Toast Notification handler on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const toastStatus = urlParams.get('toast');
+    if (toastStatus) {
+      if (toastStatus === 'added') success("Berhasil mendaftarkan santri baru!", 5000);
+      else if (toastStatus === 'updated') info("Profil santri berhasil diperbarui.", 5000);
+      else if (toastStatus === 'deleted') warning("Data santri telah dihapus dari sistem.", 5000);
+      else if (toastStatus === 'error') error(urlParams.get('message') || "Gagal menyimpan data.", 5000);
+
+      // Clean the url so refresh doesn't trigger again
+      const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({path:newurl}, '', newurl);
+    }
+  }, []);
 
   // Live Search Effect
   useEffect(() => {
@@ -569,7 +591,11 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
                           <a href={`/students/edit/${item.id}`} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" title="Edit">
                             <Edit2 size={16} />
                           </a>
-                          <button className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" title="Hapus">
+                          <button 
+                            onClick={() => setDeletingStudent(item)}
+                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" 
+                            title="Hapus"
+                          >
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -774,6 +800,99 @@ const StudentManagement: React.FC<StudentManagementProps> = ({
               </div>
             </div>
           </div>
+        </Modal>
+
+        {/* Delete Confirmation Modal (Responsive & Landscape) */}
+        <Modal
+          isOpen={!!deletingStudent}
+          onClose={() => setDeletingStudent(null)}
+          title="Hapus Data Santri"
+          description="Konfirmasi tindakan penghapusan permanen data santri"
+          size="xl"
+          variant="danger"
+          icon={<Trash2 size={28} className="text-white" />}
+          footer={
+            <>
+               <button 
+                 type="button" 
+                 onClick={() => setDeletingStudent(null)} 
+                 className="px-8 py-3.5 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-all"
+               >
+                 Batal
+               </button>
+               <button 
+                 type="submit" 
+                 form="delete-student-form" 
+                 className="px-10 py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-[22px] text-xs font-black uppercase tracking-widest shadow-2xl shadow-rose-600/30 transition-all transform active:scale-95 flex items-center gap-3"
+               >
+                 <Trash2 size={18} />
+                 <span>Hapus Permanen</span>
+               </button>
+            </>
+          }
+        >
+          <form id="delete-student-form" method="POST" action="/master-data/students" className="space-y-0">
+             <input type="hidden" name="_action" value="delete" />
+             {deletingStudent && <input type="hidden" name="id" value={deletingStudent.id} />}
+             
+             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
+               {/* Left Column: Student Profile Card (Landscape Aspect) */}
+               <div className="md:col-span-5 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[28px] border border-slate-100 dark:border-slate-800/80 flex flex-col justify-between space-y-6">
+                 <div>
+                   <div className="flex items-center gap-4">
+                     <div className="w-16 h-16 rounded-[20px] bg-slate-200 dark:bg-slate-700 ring-4 ring-white dark:ring-slate-800 shadow-md overflow-hidden flex-shrink-0">
+                       <img 
+                         src={deletingStudent?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${deletingStudent?.name || ''}`} 
+                         alt={deletingStudent?.name || ''} 
+                         className="w-full h-full object-cover"
+                       />
+                     </div>
+                     <div className="min-w-0">
+                       <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${deletingStudent ? statusStyles[deletingStudent.status] : ''}`}>
+                         {deletingStudent?.status}
+                       </span>
+                       <h4 className="text-base font-black text-slate-800 dark:text-slate-100 truncate mt-1 leading-tight">{deletingStudent?.name}</h4>
+                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{deletingStudent?.nis || 'NIS -'}</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="border-t border-slate-200/60 dark:border-slate-800/60 pt-4 space-y-3">
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Kelas:</span>
+                     <span className="text-slate-700 dark:text-slate-300 font-black">{deletingStudent?.class || '-'}</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Asrama:</span>
+                     <span className="text-slate-700 dark:text-slate-300 font-black">{deletingStudent?.dormitory || '-'}</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Wali:</span>
+                     <span className="text-slate-700 dark:text-slate-300 font-black truncate max-w-[120px]">{deletingStudent?.parentName || '-'}</span>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Right Column: Danger Warning Details */}
+               <div className="md:col-span-7 flex flex-col justify-between space-y-6">
+                 <div className="space-y-4">
+                   <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                     <AlertCircle size={24} className="flex-shrink-0 animate-pulse" />
+                     <h3 className="text-lg font-black tracking-tight">Tindakan Sangat Berbahaya!</h3>
+                   </div>
+                   <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                     Anda akan menghapus data santri secara permanen dari pangkalan data sistem. Setelah dihapus, data ini tidak dapat dikembalikan.
+                   </p>
+                 </div>
+
+                 <div className="p-5 rounded-[24px] bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400">
+                   <p className="text-xs font-bold leading-relaxed">
+                     ⚠️ <span className="font-black">PENTING:</span> Menghapus data santri ini juga akan secara otomatis menghapus seluruh riwayat nilai, kehadiran, prestasi, pelanggaran, serta penempatan kelas santri yang bersangkutan di sistem.
+                   </p>
+                 </div>
+               </div>
+             </div>
+          </form>
         </Modal>
 
       </div>

@@ -58,7 +58,7 @@ const allSubjects = await db.select().from(subjects).orderBy(subjects.name);
 
 ---
 
-<Layout title="Subject | Admin Panel" activeItem="Mata Pelajaran">
+<Layout title="Mata Pelajaran | Raport MDT Al-Amiriyyah" activeItem="Mata Pelajaran">
     <SubjectManagement 
         client:only="react" 
         initialSubjects={allSubjects}

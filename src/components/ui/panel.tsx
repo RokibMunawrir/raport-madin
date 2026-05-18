@@ -132,6 +132,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     { name: 'Nilai', icon: <FileText size={20} />, href: '/score' },
   ];
 
+  const filteredNavItems = navItems.filter(item => {
+    // Guru cannot see Keaktifan Asatidz
+    if (user?.role === 'Guru' && item.href === '/presence-asatidz') {
+      return false;
+    }
+    return true;
+  });
+
   const masterDataItems = [
     { name: 'Data Tahun Ajaran', icon: <Calendar size={18} />, href: '/master-data/academic-years' },
     { name: 'Data Asatidz', icon: <Users size={18} />, href: '/master-data/teachers' },
@@ -144,6 +152,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     { name: 'Target Hafalan', icon: <Users2 size={18} />, href: '/master-data/memorize' },
     { name: 'User', icon: <Users2 size={18} />, href: '/master-data/user' },
   ];
+
+  const filteredMasterDataItems = masterDataItems.filter(subItem => {
+    // Administrator cannot see User menu
+    if (user?.role === 'Administrator' && subItem.href === '/master-data/user') {
+      return false;
+    }
+    return true;
+  });
 
   const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
   const toggleMasterData = () => setIsMasterDataOpen(!isMasterDataOpen);
@@ -206,7 +222,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
 
             <nav className={`p-4 ${isMinimized ? 'px-2' : ''} space-y-1 flex-1`}>
-            {navItems.map((item) => (
+            {filteredNavItems.map((item) => (
               <a
                 key={item.name}
                 href={item.href}
@@ -226,47 +242,49 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             ))}
 
             {/* Master Data Dropdown */}
-            <div className="pt-2">
-              <button
-                onClick={toggleMasterData}
-                className={`w-full flex items-center ${isMinimized && !isMobileOpen ? 'justify-center' : 'justify-between px-3'} py-2.5 rounded-lg transition-all duration-200 group ${
-                  isMasterDataOpen ? 'bg-slate-50 dark:bg-slate-700/30 text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-                title={isMinimized && !isMobileOpen ? "Master Data" : ""}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
-                    <Database size={20} />
-                  </span>
-                  {( !isMinimized || isMobileOpen ) && <span>Master Data</span>}
-                </div>
-                {( !isMinimized || isMobileOpen ) && (
-                  <span className={`transition-transform duration-200 ${isMasterDataOpen ? 'rotate-180' : ''}`}>
-                    <ChevronDown size={18} className="text-slate-400 dark:text-slate-500" />
-                  </span>
+            {!(user?.role === 'Guru' || user?.role === 'Staf' || user?.role === 'Staff') && (
+              <div className="pt-2">
+                <button
+                  onClick={toggleMasterData}
+                  className={`w-full flex items-center ${isMinimized && !isMobileOpen ? 'justify-center' : 'justify-between px-3'} py-2.5 rounded-lg transition-all duration-200 group ${
+                    isMasterDataOpen ? 'bg-slate-50 dark:bg-slate-700/30 text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                  title={isMinimized && !isMobileOpen ? "Master Data" : ""}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                      <Database size={20} />
+                    </span>
+                    {( !isMinimized || isMobileOpen ) && <span>Master Data</span>}
+                  </div>
+                  {( !isMinimized || isMobileOpen ) && (
+                    <span className={`transition-transform duration-200 ${isMasterDataOpen ? 'rotate-180' : ''}`}>
+                      <ChevronDown size={18} className="text-slate-400 dark:text-slate-500" />
+                    </span>
+                  )}
+                </button>
+                
+                {isMasterDataOpen && !isMinimized && (
+                  <div className="mt-1 ml-4 pl-4 border-l border-slate-100 dark:border-slate-700 space-y-1">
+                    {filteredMasterDataItems.map((subItem) => (
+                      <a
+                        key={subItem.name}
+                        href={subItem.href}
+                        onClick={() => setActiveItem(subItem.name)}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                          activeItem === subItem.name 
+                            ? 'text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50/50 dark:bg-indigo-900/20' 
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700/30'
+                        }`}
+                      >
+                        <span>{subItem.icon}</span>
+                        <span>{subItem.name}</span>
+                      </a>
+                    ))}
+                  </div>
                 )}
-              </button>
-              
-              {isMasterDataOpen && !isMinimized && (
-                <div className="mt-1 ml-4 pl-4 border-l border-slate-100 dark:border-slate-700 space-y-1">
-                  {masterDataItems.map((subItem) => (
-                    <a
-                      key={subItem.name}
-                      href={subItem.href}
-                      onClick={() => setActiveItem(subItem.name)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                        activeItem === subItem.name 
-                          ? 'text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50/50 dark:bg-indigo-900/20' 
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700/30'
-                      }`}
-                    >
-                      <span>{subItem.icon}</span>
-                      <span>{subItem.name}</span>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="pt-4 border-t border-slate-100 my-4" />
 

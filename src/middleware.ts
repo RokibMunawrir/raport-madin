@@ -46,5 +46,30 @@ export const onRequest = defineMiddleware(async (context, next) => {
         context.locals.session = null;
     }
 
+    // 3. Role-Based Authorization Guard
+    if (context.locals.user) {
+        const user = context.locals.user;
+        const role = user.role;
+        const pathname = context.url.pathname;
+
+        const isForbidden = 
+            // Staff & Guru cannot access master data pages/APIs (except general student searches)
+            ((role === 'Guru' || role === 'Staf' || role === 'Staff') && (pathname.startsWith('/master-data') || pathname.startsWith('/api/teachers') || (pathname.startsWith('/api/students') && !pathname.startsWith('/api/students/search')))) ||
+            // Guru cannot access presence-asatidz
+            (role === 'Guru' && (pathname.startsWith('/presence-asatidz') || pathname.startsWith('/api/presence-asatidz'))) ||
+            // Administrator cannot access user pages/APIs
+            (role === 'Administrator' && (pathname.startsWith('/master-data/user') || pathname.startsWith('/api/users')));
+
+        if (isForbidden) {
+            if (pathname.startsWith('/api/')) {
+                return new Response(JSON.stringify({ error: 'Akses Ditolak (Forbidden)' }), { 
+                    status: 403, 
+                    headers: { 'Content-Type': 'application/json' } 
+                });
+            }
+            return context.redirect('/dashboard');
+        }
+    }
+
     return next();
 });

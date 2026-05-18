@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, GraduationCap } from 'lucide-react';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'supreme' | 'full';
+export type ModalVariant = 'primary' | 'danger' | 'warning' | 'success';
 
 interface ModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface ModalProps {
   footer?: React.ReactNode;
   size?: ModalSize;
   closeOnOutsideClick?: boolean;
+  variant?: ModalVariant;
+  icon?: React.ReactNode;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -24,6 +27,8 @@ const Modal: React.FC<ModalProps> = ({
   footer,
   size = 'md',
   closeOnOutsideClick = true,
+  variant = 'primary',
+  icon,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +69,13 @@ const Modal: React.FC<ModalProps> = ({
     full: 'max-w-[95vw]',
   };
 
+  const variantClasses: Record<ModalVariant, string> = {
+    primary: 'bg-indigo-600 shadow-indigo-600/30',
+    danger: 'bg-rose-600 shadow-rose-600/30',
+    warning: 'bg-amber-500 shadow-amber-500/30',
+    success: 'bg-emerald-600 shadow-emerald-600/30',
+  };
+
   return createPortal(
     <div 
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-10 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-500 overflow-hidden"
@@ -77,8 +89,8 @@ const Modal: React.FC<ModalProps> = ({
         {(title || onClose) && (
           <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between flex-shrink-0 bg-white/50 dark:bg-slate-800/50">
             <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-2xl shadow-indigo-600/30">
-                <GraduationCap size={28} className="text-white" />
+              <div className={`w-14 h-14 rounded-2xl ${variantClasses[variant]} flex items-center justify-center shadow-2xl`}>
+                {icon || <GraduationCap size={28} className="text-white" />}
               </div>
               <div>
                 {title && <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{title}</h3>}

@@ -27,7 +27,7 @@ const activeYear = await getActiveAcademicYear();
 const reportData = activeYear ? await getFullStudentReportData(id, activeYear.id) : null;
 ---
 
-<Layout title={`Detail ${student.name} - Raport Madin`}>
+<Layout title={`Detail ${student.name} | Raport MDT Al-Amiriyyah`}>
     <DetailStudent 
         client:only="react" 
         student={student}

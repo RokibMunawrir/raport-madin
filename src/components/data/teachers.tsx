@@ -1035,30 +1035,95 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
           </div>
         </Modal>
 
-        {/* Delete Confirmation Modal */}
+        {/* Delete Confirmation Modal (Responsive & Landscape) */}
         <Modal
           isOpen={!!deletingTeacher}
           onClose={() => setDeletingTeacher(null)}
-          title="Konfirmasi Hapus"
-          description={`Apakah Anda yakin ingin menghapus data asatidz ${deletingTeacher?.name}?`}
+          title="Hapus Data Asatidz"
+          description="Konfirmasi tindakan penghapusan permanen data tenaga pendidik"
+          size="xl"
+          variant="danger"
+          icon={<Trash2 size={28} className="text-white" />}
           footer={
             <>
-               <button type="button" onClick={() => setDeletingTeacher(null)} className="px-6 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Batal</button>
-               <button type="submit" form="delete-teacher-form" className="px-10 py-3 bg-rose-600 text-white rounded-2xl text-sm font-bold hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all transform active:scale-95 flex items-center gap-2">
+               <button 
+                 type="button" 
+                 onClick={() => setDeletingTeacher(null)} 
+                 className="px-8 py-3.5 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-all"
+               >
+                 Batal
+               </button>
+               <button 
+                 type="submit" 
+                 form="delete-teacher-form" 
+                 className="px-10 py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-[22px] text-xs font-black uppercase tracking-widest shadow-2xl shadow-rose-600/30 transition-all transform active:scale-95 flex items-center gap-3"
+               >
                  <Trash2 size={18} />
                  <span>Hapus Permanen</span>
                </button>
             </>
           }
         >
-          <form id="delete-teacher-form" method="POST" action="/master-data/teachers" className="space-y-4">
+          <form id="delete-teacher-form" method="POST" action="/master-data/teachers" className="space-y-0">
              <input type="hidden" name="_action" value="delete" />
              {deletingTeacher && <input type="hidden" name="id" value={deletingTeacher.id} />}
-             <div className="flex items-start gap-4 p-5 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400">
-                <AlertCircle size={24} className="flex-shrink-0 mt-0.5" />
-                <p className="text-sm font-medium leading-relaxed">
-                   Tindakan ini tidak dapat dibatalkan. Menghapus data pengajar juga akan menghilangkan riwayat Wali Kelas yang terkait dengan beliau di sistem.
-                </p>
+             
+             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
+               {/* Left Column: Teacher Profile Card (Landscape Aspect) */}
+               <div className="md:col-span-5 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[28px] border border-slate-100 dark:border-slate-800/80 flex flex-col justify-between space-y-6">
+                 <div>
+                   <div className="flex items-center gap-4">
+                     <div className="w-16 h-16 rounded-[20px] bg-slate-200 dark:bg-slate-700 ring-4 ring-white dark:ring-slate-800 shadow-md overflow-hidden flex-shrink-0">
+                       <img 
+                         src={deletingTeacher?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${deletingTeacher?.name || ''}`} 
+                         alt={deletingTeacher?.name || ''} 
+                         className="w-full h-full object-cover"
+                       />
+                     </div>
+                     <div className="min-w-0">
+                       <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${deletingTeacher ? statusStyles[deletingTeacher.status] : ''}`}>
+                         {deletingTeacher?.status}
+                       </span>
+                       <h4 className="text-base font-black text-slate-800 dark:text-slate-100 truncate mt-1 leading-tight">{deletingTeacher?.name}</h4>
+                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{deletingTeacher?.nip || 'NIP -'}</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="border-t border-slate-200/60 dark:border-slate-800/60 pt-4 space-y-3">
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Mulai Tugas:</span>
+                     <span className="text-slate-700 dark:text-slate-300 font-black">{deletingTeacher?.joinedDate || '-'}</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">No. Telepon:</span>
+                     <span className="text-slate-700 dark:text-slate-300 font-black">{deletingTeacher?.phone || '-'}</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Email:</span>
+                     <span className="text-slate-700 dark:text-slate-300 font-black truncate max-w-[120px]">{deletingTeacher?.email || '-'}</span>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Right Column: Danger Warning Details */}
+               <div className="md:col-span-7 flex flex-col justify-between space-y-6">
+                 <div className="space-y-4">
+                   <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                     <AlertCircle size={24} className="flex-shrink-0 animate-pulse" />
+                     <h3 className="text-lg font-black tracking-tight">Tindakan Sangat Berbahaya!</h3>
+                   </div>
+                   <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                     Anda akan menghapus data asatidz secara permanen dari pangkalan data sistem. Setelah dihapus, data ini tidak dapat dikembalikan.
+                   </p>
+                 </div>
+
+                 <div className="p-5 rounded-[24px] bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400">
+                   <p className="text-xs font-bold leading-relaxed">
+                     ⚠️ <span className="font-black">PENTING:</span> Menghapus akun pengajar ini juga akan secara otomatis membatalkan seluruh hak akses login yang bersangkutan, serta menghapus riwayat penugasan Wali Kelas atau riwayat pengajaran aktif beliau di sistem.
+                   </p>
+                 </div>
+               </div>
              </div>
           </form>
         </Modal>
