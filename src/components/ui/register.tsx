@@ -1,32 +1,26 @@
 import React, { useState } from 'react';
 import { 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  User, 
   UserPlus,
   Mail,
   ChevronRight, 
   Loader2,
   AlertCircle,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  BadgeCheck,
+  Hash
 } from 'lucide-react';
-import { authClient } from "../../lib/auth-client";
+import madin from '../../assets/madin.png';
 
 const RegisterForm: React.FC = () => {
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [teacherName, setTeacherName] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
+    nip: '',
     email: '',
-    password: '',
-    confirmPassword: ''
   });
-
-  const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -34,69 +28,87 @@ const RegisterForm: React.FC = () => {
       ...prev,
       [name]: value
     }));
+    if (error) setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Password dan konfirmasi password tidak cocok.');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Password minimal harus 8 karakter.');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const { data, error } = await authClient.signUp.email({
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-        callbackURL: "/login", // Redirect after success if using link
-      }, {
-        onSuccess: () => {
-          setIsSuccess(true);
-          // Redirect to login after 3 seconds
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 3000);
-        },
-        onError: (ctx) => {
-          setError(ctx.error.message || 'Terjadi kesalahan saat pendaftaran.');
-        }
+      const res = await fetch('/api/auth/register-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nip: formData.nip.trim(),
+          email: formData.email.trim().toLowerCase(),
+        }),
       });
-      
-      if (error) {
-        setError(error.message || 'Pendaftaran gagal.');
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Terjadi kesalahan. Silakan coba lagi.');
+        return;
       }
+
+      setTeacherName(data.teacherName || '');
+      setIsSuccess(true);
     } catch (err: any) {
-      setError('Terjadi kesalahan sistem. Silakan coba lagi nanti.');
+      setError('Terjadi kesalahan jaringan. Periksa koneksi Anda dan coba lagi.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Success State
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
         <div className="max-w-md w-full bg-white dark:bg-slate-800 p-10 rounded-[40px] shadow-2xl text-center animate-in zoom-in duration-500">
-          <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 scale-110">
+          <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 size={48} />
           </div>
-          <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-4">Pendaftaran Berhasil!</h2>
-          <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">
-            Akun Anda telah berhasil dibuat. Silakan masuk menggunakan email dan password Anda.
+          <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-3">
+            Pendaftaran Berhasil!
+          </h2>
+          {teacherName && (
+            <p className="text-indigo-600 dark:text-indigo-400 font-bold mb-2">
+              Halo, {teacherName}!
+            </p>
+          )}
+          <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium leading-relaxed">
+            Link pengaturan password telah dikirim ke{' '}
+            <span className="font-bold text-slate-700 dark:text-slate-300">
+              {formData.email}
+            </span>
+            . Silakan cek inbox atau folder spam Anda.
           </p>
-          <div className="flex items-center justify-center gap-3 text-sm font-bold text-indigo-600 dark:text-indigo-400">
-            <Loader2 size={18} className="animate-spin" />
-            <span>Mengalihkan ke halaman login...</span>
+          
+          {/* Info box */}
+          <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl p-4 mb-8 text-left">
+            <div className="flex items-start gap-3">
+              <BadgeCheck size={20} className="text-indigo-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mb-1">Langkah selanjutnya:</p>
+                <ol className="text-xs text-indigo-600 dark:text-indigo-400 space-y-1 list-decimal list-inside">
+                  <li>Buka email yang Anda daftarkan</li>
+                  <li>Klik tombol "Atur Password Sekarang"</li>
+                  <li>Buat password baru yang kuat</li>
+                  <li>Login menggunakan email dan password baru</li>
+                </ol>
+              </div>
+            </div>
           </div>
+
+          <a
+            href="/login"
+            className="inline-flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-all"
+          >
+            Kembali ke Halaman Login
+            <ChevronRight size={18} />
+          </a>
         </div>
       </div>
     );
@@ -104,7 +116,7 @@ const RegisterForm: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 md:p-8">
-      <div className="max-w-5xl w-full bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[700px]">
+      <div className="max-w-5xl w-full bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[600px]">
         
         {/* Left Side: Branding */}
         <div className="w-full md:w-1/2 bg-indigo-600 p-12 text-white flex flex-col justify-between relative overflow-hidden">
@@ -113,37 +125,36 @@ const RegisterForm: React.FC = () => {
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-10">
-              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <UserPlus size={28} className="text-white" />
+              <div className="w-12 h-12 flex items-center justify-center">
+                <img src={madin.src} alt="Logo Raport Madin" className="w-12 h-12" />
               </div>
               <div className="flex flex-col">
                 <span className="text-2xl font-bold tracking-tight">Raport Madin</span>
-                <span className="text-xs font-medium text-indigo-100 uppercase tracking-widest">Wali Kelas Register</span>
+                <span className="text-xs font-medium text-indigo-100 uppercase tracking-widest">MDT Al Amiriyyah</span>
               </div>
             </div>
             
             <h1 className="text-4xl font-extrabold leading-tight mb-6">
-              Bergabung Sebagai <br/> 
-              <span className="text-indigo-200">Tenaga Pendidik</span>
+              Daftar Akun <br/> 
+              <span className="text-indigo-200">Pengajar</span>
             </h1>
             <p className="text-indigo-100 text-lg leading-relaxed max-w-md font-medium">
-              Satu langkah lagi untuk mulai mengelola nilai, kehadiran, dan prestasi santri secara digital.
+              Masukkan NIP dan email Anda yang terdaftar. Link pengaturan password akan dikirimkan ke email tersebut.
             </p>
           </div>
           
           <div className="relative z-10 md:block hidden">
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[
-                "Input nilai & rapor otomatis",
-                "Manajemen kehadiran santri",
-                "Pantau target hafalan",
-                "Laporan aktivitas wali murid"
-              ].map((feature, i) => (
+                { icon: "01", label: "Masukkan NIP & Email terdaftar" },
+                { icon: "02", label: "Cek email untuk link pengaturan password" },
+                { icon: "03", label: "Buat password & mulai gunakan sistem" },
+              ].map((step, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full bg-indigo-500/50 flex items-center justify-center border border-white/20">
-                    <CheckCircle2 size={12} />
+                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-black shrink-0 border border-white/30">
+                    {step.icon}
                   </div>
-                  <span className="text-sm font-medium text-indigo-50">{feature}</span>
+                  <span className="text-sm font-medium text-indigo-50">{step.label}</span>
                 </div>
               ))}
             </div>
@@ -154,38 +165,51 @@ const RegisterForm: React.FC = () => {
         <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center bg-white dark:bg-slate-800">
           <div className="max-w-sm w-full mx-auto">
             <div className="mb-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mb-4">
+                <UserPlus size={24} />
+              </div>
               <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2">Daftar Akun</h2>
-              <p className="text-slate-500 dark:text-slate-400 font-medium">Lengkapi data di bawah untuk membuat akun baru</p>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed">
+                Gunakan NIP dan email yang telah terdaftar di sistem. Password akan dikirim melalui email.
+              </p>
             </div>
 
             {error && (
               <div className="mb-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle size={20} className="shrink-0 mt-1" />
+                <AlertCircle size={20} className="shrink-0 mt-0.5" />
                 <p className="text-sm font-bold">{error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* NIP Field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
+                  NIP (Nomor Induk Pegawai)
+                </label>
                 <div className="relative group">
                   <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                    <User size={18} />
+                    <Hash size={18} />
                   </span>
                   <input
                     type="text"
-                    name="name"
+                    name="nip"
+                    id="reg-nip"
                     required
-                    value={formData.name}
+                    value={formData.nip}
                     onChange={handleChange}
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium"
-                    placeholder="Contoh: Ust. Ahmad"
+                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium placeholder-slate-400"
+                    placeholder="Contoh: 198501012010011001"
                   />
                 </div>
+                <p className="text-xs text-slate-400 ml-1">NIP harus sesuai dengan data yang terdaftar di sistem.</p>
               </div>
 
+              {/* Email Field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
+                  Email
+                </label>
                 <div className="relative group">
                   <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
                     <Mail size={18} />
@@ -193,68 +217,40 @@ const RegisterForm: React.FC = () => {
                   <input
                     type="email"
                     name="email"
+                    id="reg-email"
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium"
+                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium placeholder-slate-400"
                     placeholder="nama@email.com"
                   />
                 </div>
+                <p className="text-xs text-slate-400 ml-1">Link pengaturan password akan dikirim ke email ini.</p>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Password</label>
-                <div className="relative group">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                    <Lock size={18} />
-                  </span>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium"
-                    placeholder="Min. 8 karakter"
-                  />
-                  <button
-                    type="button"
-                    onClick={togglePasswordVisibility}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Konfirmasi Password</label>
-                <div className="relative group">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                    <Lock size={18} />
-                  </span>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="confirmPassword"
-                    required
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium"
-                    placeholder="Ulangi password"
-                  />
+              {/* Info box */}
+              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-2xl p-3.5">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                    <strong>Catatan:</strong> NIP dan email yang Anda masukkan harus sesuai dengan data yang telah didaftarkan oleh administrator. Jika belum terdaftar, hubungi admin terlebih dahulu.
+                  </p>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/20 dark:shadow-none transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 group mt-6"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/20 dark:shadow-none transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 group mt-2"
               >
                 {isLoading ? (
-                  <Loader2 size={20} className="animate-spin" />
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    <span>Memproses...</span>
+                  </>
                 ) : (
                   <>
-                    <span>Daftar Sekarang</span>
+                    <span>Kirim Link Password</span>
                     <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
@@ -263,12 +259,12 @@ const RegisterForm: React.FC = () => {
 
             <div className="mt-8 flex items-center justify-center gap-2">
               <span className="text-sm text-slate-500 font-medium">Sudah punya akun?</span>
-              <a href="/login" className="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+              <a href="/login" className="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline">
                 Masuk
               </a>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-4">
               <a href="/login" className="flex items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                 <ArrowLeft size={14} />
                 Kembali ke Login

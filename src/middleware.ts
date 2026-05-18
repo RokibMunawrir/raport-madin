@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 export const onRequest = defineMiddleware(async (context, next) => {
     // 1. Define Public Routes
-    const publicRoutes = ["/login", "/register", "/api/auth", "/guidelines"];
+    const publicRoutes = ["/login", "/register", "/api/auth", "/guidelines", "/api/public"];
     const isPublicRoute = publicRoutes.some(route => context.url.pathname.startsWith(route));
 
     // 2. Try to get real session
