@@ -149,13 +149,50 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
         if (response.ok) {
             window.location.reload();
         } else {
-            alert('Gagal menyimpan perubahan');
+            const errData = await response.json().catch(() => ({}));
+            alert(errData.error || 'Gagal menyimpan perubahan');
         }
     } catch (error) {
         console.error('Error saving user:', error);
         alert('Terjadi kesalahan saat menyimpan');
     } finally {
         setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (userToDelete: User) => {
+    if (userToDelete.id === user?.id) {
+      alert('Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
+      return;
+    }
+
+    if (userToDelete.role === 'Super Admin') {
+      const superAdmins = users.filter(u => u.role === 'Super Admin');
+      if (superAdmins.length <= 1) {
+        alert('Tidak dapat menghapus. Harus ada minimal satu Super Admin di sistem.');
+        return;
+      }
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus pengguna "${userToDelete.name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${userToDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        window.location.reload();
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        alert(errData.error || 'Gagal menghapus pengguna');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Terjadi kesalahan saat menghapus pengguna');
     }
   };
 
@@ -316,7 +353,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
                             className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" title="Edit">
                           <Edit2 size={16} />
                         </button>
-                        <button className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" title="Hapus">
+                        <button 
+                          onClick={() => handleDelete(user)}
+                          className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" 
+                          title="Hapus"
+                        >
                           <Trash2 size={16} />
                         </button>
                       </div>

@@ -1,7 +1,7 @@
 import { db } from "../index";
 import { user } from "../auth-schema";
 import { teachers } from "../schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql, count } from "drizzle-orm";
 
 export async function getUsers() {
     return await db.select({
@@ -19,6 +19,21 @@ export async function getUsers() {
     .orderBy(desc(user.createdAt));
 }
 
+export async function getUserById(id: string) {
+    const result = await db.select()
+        .from(user)
+        .where(eq(user.id, id))
+        .limit(1);
+    return result[0] || null;
+}
+
+export async function countSuperAdmins() {
+    const [result] = await db.select({ value: count() })
+        .from(user)
+        .where(eq(user.role, 'Super Admin'));
+    return result?.value || 0;
+}
+
 export async function updateUserRoleAndTeacher(id: string, data: { role: string, teacherId?: string | null }) {
     return await db.update(user)
         .set({
@@ -32,3 +47,4 @@ export async function updateUserRoleAndTeacher(id: string, data: { role: string,
 export async function deleteUser(id: string) {
     return await db.delete(user).where(eq(user.id, id));
 }
+
