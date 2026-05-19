@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../db';
 import { students, classrooms, studentClassrooms, dormitories } from '../../../db/schema';
-import { count, eq, like, and, desc, asc, or } from 'drizzle-orm';
+import { count, eq, ilike, and, desc, asc, or } from 'drizzle-orm';
 
 export const GET: APIRoute = async ({ url }) => {
   try {
@@ -18,8 +18,8 @@ export const GET: APIRoute = async ({ url }) => {
     const filters = [];
     if (search) {
       filters.push(or(
-        like(students.name, `%${search}%`),
-        like(students.nis, `%${search}%`)
+        ilike(students.name, `%${search}%`),
+        ilike(students.nis, `%${search}%`)
       ));
     }
     if (statusFilter && statusFilter !== 'All') {

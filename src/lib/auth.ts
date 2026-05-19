@@ -15,6 +15,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const isMailtarget = (process.env.SMTP_SERVER || '').includes('mtrgt.net');
+const smtpFrom = process.env.SMTP_FROM || (isMailtarget ? 'default@sandbox.mailtarget.co' : process.env.SMTP_USER);
+
 export const auth = betterAuth({
     baseUrl: process.env.BETTER_AUTH_URL,
     trustedOrigins: [process.env.BETTER_AUTH_URL!],
@@ -27,7 +30,7 @@ export const auth = betterAuth({
         sendResetPassword: async ({ user, url }) => {
             try {
                 await transporter.sendMail({
-                    from: `"Raport MDT Al-Amiriyyah" <${process.env.SMTP_USER}>`,
+                    from: `"Raport MDT Al-Amiriyyah" <${smtpFrom}>`,
                     to: user.email,
                     subject: "Atur Password Akun Anda – Raport Madin",
                     html: `

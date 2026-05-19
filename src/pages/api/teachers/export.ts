@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import * as xlsx from 'xlsx';
 import { db } from '../../../db';
 import { teachers } from '../../../db/schema';
-import { desc, eq, and, or, like } from 'drizzle-orm';
+import { desc, eq, and, or, ilike } from 'drizzle-orm';
 
 export const GET: APIRoute = async ({ url }) => {
   try {
@@ -12,8 +12,8 @@ export const GET: APIRoute = async ({ url }) => {
     const filters = [];
     if (search) {
       filters.push(or(
-        like(teachers.name, `%${search}%`),
-        like(teachers.nip, `%${search}%`)
+        ilike(teachers.name, `%${search}%`),
+        ilike(teachers.nip, `%${search}%`)
       ));
     }
     if (statusFilter !== 'All') {

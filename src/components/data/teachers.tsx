@@ -151,28 +151,108 @@ interface TeacherManagementProps {
 
 const TeacherManagement: React.FC<TeacherManagementProps> = ({ 
   initialData = initialTeachers,
-  currentPage,
-  totalPages,
-  totalCount,
-  searchQuery: initialSearchQuery,
-  statusFilter: initialStatusFilter,
-  sortBy = 'name',
-  sortOrder = 'asc',
+  currentPage: initialCurrentPage,
+  totalPages: initialTotalPages,
+  totalCount: initialTotalCount,
+  searchQuery: initialSearchQuery = '',
+  statusFilter: initialStatusFilter = 'All',
+  sortBy: initialSortBy = 'name',
+  sortOrder: initialSortOrder = 'asc',
   user
 }) => {
 
   const [data, setData] = useState<Teacher[]>(initialData);
+  const [currentPage, setCurrentPage] = useState(initialCurrentPage);
+  const [totalPages, setTotalPages] = useState(initialTotalPages);
+  const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [deletingTeacher, setDeletingTeacher] = useState<Teacher | null>(null);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [sortBy, setSortBy] = useState(initialSortBy);
+  const [sortOrder, setSortOrder] = useState(initialSortOrder);
+  const [isSearching, setIsSearching] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{message?: string, error?: string, details?: {row: number, column: string, message: string}[]} | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const { success, error, info, warning } = useNotification();
+
+  // Live Search Effect
+  useEffect(() => {
+    // If everything matches initial state AND we are on page 1, we can use initialData instantly
+    const isInitialState = searchQuery === '' && 
+                          statusFilter === 'All' && 
+                          currentPage === 1;
+
+    if (isInitialState && initialData) {
+        setData(initialData);
+        setTotalPages(initialTotalPages);
+        setTotalCount(initialTotalCount);
+        // Update URL to clean state
+        const url = new URL(window.location.href);
+        ['search', 'status', 'page', 'sortBy', 'sortOrder'].forEach(k => url.searchParams.delete(k));
+        window.history.pushState({}, '', url.toString());
+        return;
+    }
+
+    // Skip first run if query is same as initial to avoid redundant fetch on mount
+    if (searchQuery === initialSearchQuery && 
+        statusFilter === initialStatusFilter && 
+        currentPage === initialCurrentPage &&
+        sortBy === initialSortBy &&
+        sortOrder === initialSortOrder) {
+        return;
+    }
+
+    const fetchTeachers = async () => {
+      setIsSearching(true);
+      try {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('search', searchQuery);
+        if (statusFilter !== 'All') params.set('status', statusFilter);
+        params.set('page', currentPage.toString());
+        params.set('sortBy', sortBy);
+        params.set('sortOrder', sortOrder);
+
+        const response = await fetch(`/api/teachers/search?${params.toString()}`);
+        const result = await response.json();
+        
+        if (response.ok) {
+          setData(result.data);
+          setTotalPages(result.pagination.totalPages);
+          setTotalCount(result.pagination.totalCount);
+          
+          // Update URL without reload
+          const url = new URL(window.location.href);
+          params.forEach((value, key) => url.searchParams.set(key, value));
+          
+          // Cleanup URL
+          if (statusFilter === 'All') url.searchParams.delete('status');
+          if (!searchQuery) url.searchParams.delete('search');
+          if (currentPage === 1) url.searchParams.delete('page');
+          if (sortBy === 'name') url.searchParams.delete('sortBy');
+          if (sortOrder === 'asc') url.searchParams.delete('sortOrder');
+          
+          window.history.pushState({}, '', url.toString());
+        }
+      } catch (error) {
+        console.error("Error fetching teachers:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    // If search is cleared, fetch immediately. Otherwise debounce.
+    const delay = searchQuery === '' ? 0 : 500;
+    const timer = setTimeout(() => {
+      fetchTeachers();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, statusFilter, currentPage, sortBy, sortOrder]);
 
   const handleImport = async () => {
     if (!importFile) return;
@@ -406,17 +486,13 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
   };
 
   const updateFilters = (newParams: Record<string, string>) => {
-    const url = new URL(window.location.href);
-    Object.entries(newParams).forEach(([key, value]) => {
-      if (value === 'All' || value === '') {
-        url.searchParams.delete(key);
-      } else {
-        url.searchParams.set(key, value);
-      }
-    });
-    // Reset to page 1 when filter changes
-    if (!newParams.page) url.searchParams.set('page', '1');
-    window.location.href = url.pathname + url.search;
+    if (newParams.search !== undefined) setSearchQuery(newParams.search);
+    if (newParams.status !== undefined) setStatusFilter(newParams.status);
+    if (newParams.sortBy !== undefined) setSortBy(newParams.sortBy);
+    if (newParams.sortOrder !== undefined) setSortOrder(newParams.sortOrder);
+    if (newParams.page !== undefined) setCurrentPage(parseInt(newParams.page));
+    // Reset page to 1 if filter changes but not page
+    if (newParams.page === undefined) setCurrentPage(1);
   };
 
   const stats = useMemo(() => {
@@ -446,7 +522,7 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
               {/* Search */}
               <div className="relative w-full sm:max-w-xs">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Search size={18} />
+                  {isSearching ? <span className="w-4 h-4 border-2 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></span> : <Search size={18} />}
                 </span>
                 <input
                   type="text"
@@ -454,7 +530,6 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
                   placeholder="Cari Nama atau NIP..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && updateFilters({ search: searchQuery })}
                 />
               </div>
 
@@ -599,16 +674,26 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
               </tbody>
             </table>
           </div>
+          {data.length > 0 && (
+            <div className="px-10 py-6 bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                Menampilkan {((currentPage - 1) * 10) + 1} - {Math.min(currentPage * 10, totalCount)} dari {totalCount} Asatidz
+              </p>
+              <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(page: number) => updateFilters({ page: page.toString() })}
+              />
+            </div>
+          )}
+          {data.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-300">
+               <Users size={64} className="mb-4 opacity-10" />
+               <p className="text-sm font-bold">Data Asatidz tidak ditemukan</p>
+               <p className="text-xs font-medium opacity-60">Coba gunakan kata kunci pencarian lain.</p>
+            </div>
+          )}
         </div>
-
-        {/* Pagination */}
-        {data.length > 0 && (
-          <Pagination 
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page: number) => updateFilters({ page: page.toString() })}
-          />
-        )}
 
         {/* Add/Edit Modal (Landscape) */}
         <Modal 

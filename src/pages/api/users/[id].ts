@@ -82,3 +82,49 @@ export const DELETE: APIRoute = async ({ params }) => {
     }
 };
 
+export const POST: APIRoute = async ({ params }) => {
+    const id = params.id;
+    if (!id) return new Response(null, { status: 400 });
+
+    try {
+        const targetUser = await getUserById(id);
+        if (!targetUser) {
+            return new Response(JSON.stringify({ error: "User tidak ditemukan" }), {
+                status: 404,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Kirim email reset/set password melalui better-auth request-password-reset endpoint
+        const baseUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:4321";
+        const resetRes = await fetch(`${baseUrl}/api/auth/request-password-reset`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: targetUser.email,
+                redirectTo: `${baseUrl}/reset-password`,
+            }),
+        });
+
+        if (!resetRes.ok) {
+            const errText = await resetRes.text();
+            console.error("Gagal memicu pengiriman email reset password:", errText);
+            return new Response(JSON.stringify({ error: "Gagal memicu pengiriman email. Pastikan konfigurasi SMTP benar." }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        return new Response(JSON.stringify({ success: true, message: `Email link setup password berhasil dikirim ulang ke ${targetUser.email}.` }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (e) {
+        console.error("API Error resending email:", e);
+        return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+};
+

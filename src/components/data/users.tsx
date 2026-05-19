@@ -18,10 +18,13 @@ import {
   Shield,
   Activity,
   ChevronRight,
-  GraduationCap
+  GraduationCap,
+  Send,
+  Loader2
 } from 'lucide-react';
 import AdminPanel from '../ui/panel';
 import Modal from '../ui/modal';
+import { useNotification } from '../ui/notification';
 
 
 // --- Types ---
@@ -120,6 +123,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [resendingUserId, setResendingUserId] = useState<string | null>(null);
+  const notification = useNotification();
   
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
@@ -160,24 +169,32 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
     }
   };
 
-  const handleDelete = async (userToDelete: User) => {
-    if (userToDelete.id === user?.id) {
-      alert('Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
+  const handleDeleteClick = (userToDel: User) => {
+    setDeleteError(null);
+    if (userToDel.id === user?.id) {
+      setDeleteError('Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
+      setUserToDelete(userToDel);
+      setIsDeleteModalOpen(true);
       return;
     }
 
-    if (userToDelete.role === 'Super Admin') {
+    if (userToDel.role === 'Super Admin') {
       const superAdmins = users.filter(u => u.role === 'Super Admin');
       if (superAdmins.length <= 1) {
-        alert('Tidak dapat menghapus. Harus ada minimal satu Super Admin di sistem.');
+        setDeleteError('Tidak dapat menghapus. Harus ada minimal satu Super Admin di sistem.');
+        setUserToDelete(userToDel);
+        setIsDeleteModalOpen(true);
         return;
       }
     }
 
-    if (!confirm(`Apakah Anda yakin ingin menghapus pengguna "${userToDelete.name}"?`)) {
-      return;
-    }
+    setUserToDelete(userToDel);
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!userToDelete || deleteError) return;
+    setIsDeleting(true);
     try {
       const response = await fetch(`/api/users/${userToDelete.id}`, {
         method: 'DELETE',
@@ -188,11 +205,35 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
         window.location.reload();
       } else {
         const errData = await response.json().catch(() => ({}));
-        alert(errData.error || 'Gagal menghapus pengguna');
+        setDeleteError(errData.error || 'Gagal menghapus pengguna');
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Terjadi kesalahan saat menghapus pengguna');
+      setDeleteError('Terjadi kesalahan saat menghapus pengguna');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleResendEmail = async (targetUser: User) => {
+    setResendingUserId(targetUser.id);
+    try {
+      const response = await fetch(`/api/users/${targetUser.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        notification.success(result.message || 'Email link setup password berhasil dikirim.');
+      } else {
+        notification.error(result.error || 'Gagal mengirim ulang email.');
+      }
+    } catch (err) {
+      console.error('Error resending email:', err);
+      notification.error('Terjadi kesalahan saat mengirim ulang email.');
+    } finally {
+      setResendingUserId(null);
     }
   };
 
@@ -349,12 +390,24 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
                     <td className="px-8 py-5">
                       <div className="flex items-center justify-end gap-3 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                         <button 
+                            onClick={() => handleResendEmail(user)}
+                            disabled={resendingUserId !== null}
+                            className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 disabled:opacity-50" 
+                            title="Kirim Ulang Email Aktivasi/Reset Password"
+                        >
+                          {resendingUserId === user.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Send size={16} />
+                          )}
+                        </button>
+                        <button 
                             onClick={() => handleEdit(user)}
                             className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" title="Edit">
                           <Edit2 size={16} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(user)}
+                          onClick={() => handleDeleteClick(user)}
                           className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700" 
                           title="Hapus"
                         >
@@ -491,6 +544,76 @@ const UserManagement: React.FC<UserManagementProps> = ({ initialData = [], teach
               </div>
             </div>
           </div>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={isDeleteModalOpen}
+          variant={deleteError ? "warning" : "danger"}
+          size="md"
+          onClose={() => { setIsDeleteModalOpen(false); setUserToDelete(null); setDeleteError(null); }}
+          title={deleteError ? "Tindakan Ditolak" : "Konfirmasi Hapus Pengguna"}
+          description={deleteError ? "Akses tidak diizinkan oleh sistem" : "Hapus akses pengguna sistem"}
+          icon={deleteError ? <Shield size={28} className="text-white" /> : <Trash2 size={28} className="text-white" />}
+          footer={
+            <>
+              <button 
+                onClick={() => { setIsDeleteModalOpen(false); setUserToDelete(null); setDeleteError(null); }} 
+                className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-all"
+              >
+                {deleteError ? "Tutup" : "Batal"}
+              </button>
+              {!deleteError && (
+                <button 
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="px-8 py-3 bg-rose-600 text-white rounded-2xl text-sm font-black hover:bg-rose-700 shadow-xl shadow-rose-600/30 transition-all transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+                  <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Pengguna'}</span>
+                </button>
+              )}
+            </>
+          }
+        >
+          {deleteError ? (
+            <div className="space-y-4 text-center py-4">
+              <div className="w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500 mx-auto border border-amber-100 dark:border-amber-500/20">
+                <Shield size={32} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg font-black text-slate-800 dark:text-slate-100">Pelanggaran Aturan Sistem</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-sm mx-auto">{deleteError}</p>
+              </div>
+            </div>
+          ) : (
+            userToDelete && (
+              <div className="space-y-6">
+                <div className="p-6 rounded-3xl bg-rose-50 dark:bg-rose-500/5 border border-rose-100 dark:border-rose-500/20 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-sm flex-shrink-0">
+                    <img 
+                      src={userToDelete.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${userToDelete.name}`} 
+                      alt="" 
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-md font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate">{userToDelete.name}</p>
+                    <p className="text-xs font-bold text-slate-400 tracking-widest uppercase truncate">{userToDelete.email}</p>
+                    <span className="inline-block px-2.5 py-0.5 mt-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-rose-100/60 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400">
+                      {userToDelete.role}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Apakah Anda benar-benar yakin?</p>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Tindakan ini akan menghapus akun pengguna secara permanen dari sistem. Pengguna ini tidak akan dapat login lagi dan semua sesi aktifnya akan segera dihentikan.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
         </Modal>
 
       </div>

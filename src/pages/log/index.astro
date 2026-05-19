@@ -6,7 +6,9 @@ const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
 const sessionUser = user as any;
 
-const result = await getAllActivityLogs({ page: 1, limit: 10 });
+const pageParam = Astro.url.searchParams.get("page");
+const page = pageParam ? parseInt(pageParam) : 1;
+const result = await getAllActivityLogs({ page, limit: 10 });
 const stats = await getActivityLogStats();
 
 ---

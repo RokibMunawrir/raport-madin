@@ -35,14 +35,6 @@ export const POST: APIRoute = async ({ request }) => {
 
     const teacher = teacherList[0];
 
-    // 2. Validasi email cocok dengan data guru (jika sudah ada email di data guru)
-    if (teacher.email && teacher.email.toLowerCase() !== normalizedEmail) {
-      return new Response(
-        JSON.stringify({ error: "Email tidak sesuai dengan data yang terdaftar untuk NIP ini." }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
     // 3. Buat akun user dengan password sementara (random, tidak akan digunakan)
     const tempPassword = `Tmp_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}_Aa1!`;
 
@@ -91,17 +83,15 @@ export const POST: APIRoute = async ({ request }) => {
       })
       .where(eq(userTable.id, newUserId));
 
-    // Juga update email di tabel teachers jika belum ada
-    if (!teacher.email) {
-      await db
-        .update(teachers)
-        .set({ email: normalizedEmail, updatedAt: new Date() })
-        .where(eq(teachers.id, teacher.id));
-    }
+    // Selalu update email di tabel teachers agar data profil guru sinkron dengan email aktif yang didaftarkan
+    await db
+      .update(teachers)
+      .set({ email: normalizedEmail, updatedAt: new Date() })
+      .where(eq(teachers.id, teacher.id));
 
-    // 5. Kirim email reset/set password melalui better-auth forget-password endpoint
+    // 5. Kirim email reset/set password melalui better-auth request-password-reset endpoint
     const baseUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:4321";
-    const resetRes = await fetch(`${baseUrl}/api/auth/forget-password`, {
+    const resetRes = await fetch(`${baseUrl}/api/auth/request-password-reset`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

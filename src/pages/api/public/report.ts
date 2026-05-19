@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../db';
 import { students, academicYears } from '../../../db/schema';
-import { eq, and, or, like } from 'drizzle-orm';
+import { eq, and, or, ilike } from 'drizzle-orm';
 import { getFullStudentReportData } from '../../../db/queries/reports';
 
 export const GET: APIRoute = async ({ url }) => {
@@ -63,7 +63,7 @@ export const GET: APIRoute = async ({ url }) => {
         })
         .from(students)
         .where(or(
-          like(students.name, `%${search}%`),
+          ilike(students.name, `%${search}%`),
           eq(students.nis, search)
         ))
         .limit(5);

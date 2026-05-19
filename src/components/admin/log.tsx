@@ -109,6 +109,30 @@ const SystemLog: React.FC<SystemLogProps> = ({ initialLogs, total, totalPages, c
 
   const modules = ['Semua', 'Sistem', 'Akademik', 'Admin', 'Kesiswaan'];
 
+  const handlePageChange = (pageNum: number) => {
+    if (pageNum < 1 || pageNum > totalPages) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', pageNum.toString());
+    window.location.href = url.toString();
+  };
+
+  const getPagesToShow = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
+
   return (
     <AdminPanel title="System Activity Log" activeItem="System Activity Log" user={user}>
 
@@ -273,17 +297,18 @@ const SystemLog: React.FC<SystemLogProps> = ({ initialLogs, total, totalPages, c
             
             <div className="flex items-center gap-2">
                 <button 
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                 <ChevronLeft size={16} />
                 </button>
                 <div className="flex items-center gap-1">
-                {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const pageNum = i + 1;
+                {getPagesToShow().map((pageNum) => {
                     return (
                     <button 
                         key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
                         className={`min-w-[32px] h-8 text-[10px] font-black rounded-lg transition-all ${
                         currentPage === pageNum 
                             ? 'bg-indigo-600 text-white shadow-md' 
@@ -296,6 +321,7 @@ const SystemLog: React.FC<SystemLogProps> = ({ initialLogs, total, totalPages, c
                 })}
                 </div>
                 <button 
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >

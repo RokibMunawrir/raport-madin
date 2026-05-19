@@ -170,7 +170,7 @@ const RegisterForm: React.FC = () => {
               </div>
               <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2">Daftar Akun</h2>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed">
-                Gunakan NIP dan email yang telah terdaftar di sistem. Password akan dikirim melalui email.
+                Masukkan NIP Anda dan email aktif yang ingin digunakan untuk menerima link pengaturan password.
               </p>
             </div>
 
@@ -225,15 +225,15 @@ const RegisterForm: React.FC = () => {
                     placeholder="nama@email.com"
                   />
                 </div>
-                <p className="text-xs text-slate-400 ml-1">Link pengaturan password akan dikirim ke email ini.</p>
+                <p className="text-xs text-slate-400 ml-1">Link pengaturan password akan dikirim ke email ini dan otomatis memperbarui data profil Anda.</p>
               </div>
 
               {/* Info box */}
-              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-2xl p-3.5">
+              <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl p-3.5">
                 <div className="flex items-start gap-2.5">
-                  <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                    <strong>Catatan:</strong> NIP dan email yang Anda masukkan harus sesuai dengan data yang telah didaftarkan oleh administrator. Jika belum terdaftar, hubungi admin terlebih dahulu.
+                  <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                    <strong>Informasi:</strong> Masukkan email aktif Anda. Sistem akan otomatis memperbarui email dummy di profil guru Anda dengan email aktif ini agar tetap terhubung.
                   </p>
                 </div>
               </div>
