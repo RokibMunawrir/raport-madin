@@ -139,14 +139,14 @@ const RegisterForm: React.FC = () => {
               <span className="text-indigo-200">Pengajar</span>
             </h1>
             <p className="text-indigo-100 text-lg leading-relaxed max-w-md font-medium">
-              Masukkan NIP dan email Anda yang terdaftar. Link pengaturan password akan dikirimkan ke email tersebut.
+              Masukkan NIPY dan email Anda yang terdaftar. Link pengaturan password akan dikirimkan ke email tersebut.
             </p>
           </div>
           
           <div className="relative z-10 md:block hidden">
             <div className="space-y-3">
               {[
-                { icon: "01", label: "Masukkan NIP & Email terdaftar" },
+                { icon: "01", label: "Masukkan NIPY & Email terdaftar" },
                 { icon: "02", label: "Cek email untuk link pengaturan password" },
                 { icon: "03", label: "Buat password & mulai gunakan sistem" },
               ].map((step, i) => (
@@ -170,7 +170,7 @@ const RegisterForm: React.FC = () => {
               </div>
               <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2">Daftar Akun</h2>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed">
-                Masukkan NIP Anda dan email aktif yang ingin digunakan untuk menerima link pengaturan password.
+                Masukkan NIPY Anda dan email aktif yang ingin digunakan untuk menerima link pengaturan password.
               </p>
             </div>
 
@@ -185,7 +185,7 @@ const RegisterForm: React.FC = () => {
               {/* NIP Field */}
               <div className="space-y-1.5">
                 <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
-                  NIP (Nomor Induk Pegawai)
+                  NIPY (Nomor Induk Pegawai Yayasan)
                 </label>
                 <div className="relative group">
                   <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
@@ -202,7 +202,7 @@ const RegisterForm: React.FC = () => {
                     placeholder="Contoh: 198501012010011001"
                   />
                 </div>
-                <p className="text-xs text-slate-400 ml-1">NIP harus sesuai dengan data yang terdaftar di sistem.</p>
+                <p className="text-xs text-slate-400 ml-1">NIPY harus sesuai dengan data yang terdaftar di sistem.</p>
               </div>
 
               {/* Email Field */}
