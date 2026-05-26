@@ -89,22 +89,17 @@ export const POST: APIRoute = async ({ request }) => {
       .set({ email: normalizedEmail, updatedAt: new Date() })
       .where(eq(teachers.id, teacher.id));
 
-    // 5. Kirim email reset/set password melalui better-auth request-password-reset endpoint
+    // 5. Kirim email reset/set password melalui better-auth
     const baseUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:4321";
-    const resetRes = await fetch(`${baseUrl}/api/auth/request-password-reset`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: normalizedEmail,
-        redirectTo: `${baseUrl}/reset-password`,
-      }),
-    });
-
-    if (!resetRes.ok) {
-      console.error(
-        "Gagal memicu pengiriman email reset password:",
-        await resetRes.text()
-      );
+    try {
+      await auth.api.requestPasswordReset({
+        body: {
+          email: normalizedEmail,
+          redirectTo: `${baseUrl}/reset-password`,
+        },
+      });
+    } catch (err) {
+      console.error("Gagal memicu pengiriman email reset password:", err);
       // Tetap kembalikan sukses karena akun sudah dibuat — user bisa request ulang
     }
 

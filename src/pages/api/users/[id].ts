@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { getUserById, countSuperAdmins, updateUserRoleAndTeacher, deleteUser } from "../../../db/queries/users";
+import { auth } from "../../../lib/auth";
 
 export const PATCH: APIRoute = async ({ params, request }) => {
     const id = params.id;
@@ -95,21 +96,18 @@ export const POST: APIRoute = async ({ params }) => {
             });
         }
 
-        // Kirim email reset/set password melalui better-auth request-password-reset endpoint
+        // Kirim email reset/set password melalui better-auth
         const baseUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:4321";
-        const resetRes = await fetch(`${baseUrl}/api/auth/request-password-reset`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                email: targetUser.email,
-                redirectTo: `${baseUrl}/reset-password`,
-            }),
-        });
-
-        if (!resetRes.ok) {
-            const errText = await resetRes.text();
-            console.error("Gagal memicu pengiriman email reset password:", errText);
-            return new Response(JSON.stringify({ error: "Gagal memicu pengiriman email. Pastikan konfigurasi SMTP benar." }), {
+        try {
+            await auth.api.requestPasswordReset({
+                body: {
+                    email: targetUser.email,
+                    redirectTo: `${baseUrl}/reset-password`,
+                },
+            });
+        } catch (err: any) {
+            console.error("Gagal memicu pengiriman email reset password:", err);
+            return new Response(JSON.stringify({ error: `Gagal memicu pengiriman email: ${err?.message || "Pastikan konfigurasi SMTP benar."}` }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
             });

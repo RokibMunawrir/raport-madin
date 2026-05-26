@@ -141,7 +141,7 @@ const LoginForm: React.FC = () => {
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Password
                   </label>
-                  <a href="#" className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+                  <a href="/forgot-password" className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
                     Lupa Password?
                   </a>
                 </div>
